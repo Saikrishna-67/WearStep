@@ -20,12 +20,18 @@ const sendOtpEmail = async (email, otp, name = 'Valued Customer') => {
       port: Number(process.env.SMTP_PORT) || 587,
       secure: process.env.SMTP_SECURE === 'true',
       auth: { user, pass },
+      connectionTimeout: 4000,
+      greetingTimeout: 4000,
+      socketTimeout: 4000,
     });
   } else if (user && pass) {
     // Default to Gmail if EMAIL_USER and EMAIL_PASS are set
     transporter = nodemailer.createTransport({
       service: 'gmail',
       auth: { user, pass },
+      connectionTimeout: 4000,
+      greetingTimeout: 4000,
+      socketTimeout: 4000,
     });
   }
 

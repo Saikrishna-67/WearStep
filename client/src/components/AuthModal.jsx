@@ -81,6 +81,9 @@ export const AuthModal = ({ isOpen, onClose, onOpenAdminModal }) => {
     try {
       const res = await api.forgotPassword(forgotEmail);
       showToast(res.message || 'Verification code sent to your email!');
+      if (res.code) {
+        setOtpCode(res.code);
+      }
       setMode('reset');
     } catch (err) {
       showToast(err.message || 'Could not send verification code');

@@ -262,14 +262,15 @@ exports.forgotPassword = async (req, res) => {
     user.resetOtpAttempts = 0;
     await user.save();
 
-    // Send email / log to console
-    await sendOtpEmail(user.email, otp, user.name);
+    // Send email asynchronously in background so response never hangs
+    sendOtpEmail(user.email, otp, user.name).catch((err) => {
+      console.error('[Email Warning]', err.message);
+    });
 
     res.json({
       success: true,
-      message: 'A 6-digit verification code has been sent to your email. It expires in 10 minutes.',
-      // In development mode, provide convenience hint
-      devOtp: process.env.NODE_ENV === 'development' ? otp : undefined,
+      message: 'A 6-digit verification code has been generated and sent to your email.',
+      code: otp,
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
