@@ -9,6 +9,7 @@ const {
   forgotPassword,
   verifyOtp,
   resetPassword,
+  emailDiagnostic,
 } = require('../controllers/authController');
 const { protect } = require('../middleware/auth');
 
@@ -20,5 +21,6 @@ router.put('/profile', protect, updateProfile);
 router.post('/forgot-password', forgotPassword);
 router.post('/verify-otp', verifyOtp);
 router.post('/reset-password', resetPassword);
+router.get('/email-diagnostic', emailDiagnostic);
 
 module.exports = router;

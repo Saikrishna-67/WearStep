@@ -373,3 +373,24 @@ exports.resetPassword = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
+// @desc    Diagnose email sending on server
+// @route   GET /api/auth/email-diagnostic
+// @access  Public
+exports.emailDiagnostic = async (req, res) => {
+  const emailUser = process.env.EMAIL_USER || process.env.SMTP_USER || null;
+  const emailPassRaw = process.env.EMAIL_PASS || process.env.SMTP_PASS || '';
+  const emailPassSet = Boolean(emailPassRaw);
+  const emailPassLength = emailPassRaw.length;
+
+  const testEmail = req.query.to || emailUser || 'saikrish6901@gmail.com';
+  const sendResult = await sendOtpEmail(testEmail, '999888', 'Diagnostic Test');
+
+  res.json({
+    emailUser,
+    emailPassSet,
+    emailPassLength,
+    testEmail,
+    sendResult,
+  });
+};
