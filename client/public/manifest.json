@@ -1,0 +1,25 @@
+{
+  "short_name": "WearStep",
+  "name": "WearStep — Step Into It",
+  "description": "Wear Your Style. Step Your Way. Premium urban streetwear and footwear.",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#191A18",
+  "theme_color": "#D4A64A",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "scope": "/"
+}
