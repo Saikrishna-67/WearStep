@@ -328,14 +328,14 @@ exports.verifyOtp = async (req, res) => {
   }
 };
 
-// @desc    Reset Password (direct or with OTP)
+// @desc    Reset Password with verified email OTP
 // @route   POST /api/auth/reset-password
 // @access  Public
 exports.resetPassword = async (req, res) => {
   try {
-    const { email, newPassword, otp } = req.body;
-    if (!email || !newPassword) {
-      return res.status(400).json({ success: false, message: 'Email and new password are required' });
+    const { email, otp, newPassword } = req.body;
+    if (!email || !otp || !newPassword) {
+      return res.status(400).json({ success: false, message: 'Email, verification code, and new password are required' });
     }
 
     if (newPassword.length < 6) {
@@ -345,16 +345,17 @@ exports.resetPassword = async (req, res) => {
     const normalizedEmail = email.toLowerCase().trim();
     const user = await User.findOne({ email: normalizedEmail });
 
-    if (!user) {
-      return res.status(404).json({ success: false, message: 'No account found with this email address' });
+    if (!user || !user.resetOtpHash || !user.resetOtpExpiry) {
+      return res.status(400).json({ success: false, message: 'Invalid or expired verification session. Please request a new code.' });
     }
 
-    // If OTP was provided, verify it; otherwise allow direct password reset
-    if (otp && user.resetOtpHash) {
-      const isMatch = await bcrypt.compare(otp.trim(), user.resetOtpHash);
-      if (!isMatch) {
-        return res.status(400).json({ success: false, message: 'Invalid OTP verification code' });
-      }
+    if (new Date() > user.resetOtpExpiry) {
+      return res.status(400).json({ success: false, message: 'Verification code has expired. Please request a new one.' });
+    }
+
+    const isMatch = await bcrypt.compare(otp.trim(), user.resetOtpHash);
+    if (!isMatch) {
+      return res.status(400).json({ success: false, message: 'Invalid 6-digit verification code. Please check your email.' });
     }
 
     const salt = await bcrypt.genSalt(10);
@@ -366,7 +367,7 @@ exports.resetPassword = async (req, res) => {
 
     res.json({
       success: true,
-      message: 'Password updated successfully! You can now log in with your new password.',
+      message: 'Password reset successful! You can now log in with your new password.',
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
