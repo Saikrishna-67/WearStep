@@ -6,7 +6,7 @@ import { useToast } from '../context/ToastContext';
 
 export const Profile = ({ onOpenWishlist, onOpenAuth }) => {
   const navigate = useNavigate();
-  const { user, isLoggedIn, logout, updateProfile } = useAuth();
+  const { user, isLoggedIn, loading: authLoading, logout, updateProfile } = useAuth();
   const { wishlistCount } = useWishlist();
   const { showToast } = useToast();
 
@@ -14,6 +14,7 @@ export const Profile = ({ onOpenWishlist, onOpenAuth }) => {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
+    if (authLoading) return;
     if (!isLoggedIn) {
       showToast('Please login to view your profile');
       navigate('/');
@@ -21,7 +22,7 @@ export const Profile = ({ onOpenWishlist, onOpenAuth }) => {
     } else if (user) {
       setName(user.name);
     }
-  }, [isLoggedIn, user]);
+  }, [isLoggedIn, user, authLoading]);
 
   const initials = (str) => {
     if (!str) return 'WS';

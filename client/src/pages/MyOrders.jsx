@@ -8,20 +8,21 @@ const TRACK_STAGES = ['Placed', 'Shipped', 'Delivered'];
 
 export const MyOrders = ({ onOpenAuth }) => {
   const navigate = useNavigate();
-  const { isLoggedIn } = useAuth();
+  const { isLoggedIn, loading: authLoading } = useAuth();
   const { showToast } = useToast();
 
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (authLoading) return;
     if (!isLoggedIn) {
       showToast('Please login to view your orders');
       onOpenAuth();
       return;
     }
     fetchOrders();
-  }, [isLoggedIn]);
+  }, [isLoggedIn, authLoading]);
 
   const fetchOrders = async () => {
     setLoading(true);

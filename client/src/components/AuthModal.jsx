@@ -19,8 +19,8 @@ export const AuthModal = ({ isOpen, onClose, onOpenAdminModal }) => {
   const [regPassword, setRegPassword] = useState('');
 
   const [forgotEmail, setForgotEmail] = useState('');
-  const [otpCode, setOtpCode] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
 
   if (!isOpen) return null;
 
@@ -72,41 +72,29 @@ export const AuthModal = ({ isOpen, onClose, onOpenAdminModal }) => {
 
   const handleForgotSubmit = async (e) => {
     e.preventDefault();
-    if (!forgotEmail) {
-      showToast('Please enter your email address');
-      return;
-    }
-    setLoading(true);
-    try {
-      const res = await api.forgotPassword(forgotEmail);
-      showToast(res.message || 'OTP sent to your email');
-      setMode('reset');
-    } catch (err) {
-      showToast(err.message || 'Could not send reset code');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleResetSubmit = async (e) => {
-    e.preventDefault();
-    if (!otpCode || !newPassword) {
-      showToast('Please enter the 6-digit code and new password');
+    if (!forgotEmail || !newPassword || !confirmPassword) {
+      showToast('Please fill in all fields');
       return;
     }
     if (newPassword.length < 6) {
       showToast('Password must be at least 6 characters');
       return;
     }
+    if (newPassword !== confirmPassword) {
+      showToast('Passwords do not match');
+      return;
+    }
     setLoading(true);
     try {
-      const res = await api.resetPassword(forgotEmail, otpCode, newPassword);
-      showToast(res.message || 'Password reset successful! Please log in.');
+      const res = await api.resetPassword(forgotEmail, newPassword);
+      showToast(res.message || 'Password updated successfully! Please log in.');
       setMode('login');
       setLoginEmail(forgotEmail);
       setLoginPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
     } catch (err) {
-      showToast(err.message || 'Password reset failed');
+      showToast(err.message || 'Could not update password');
     } finally {
       setLoading(false);
     }
@@ -260,12 +248,12 @@ export const AuthModal = ({ isOpen, onClose, onOpenAdminModal }) => {
           </form>
         )}
 
-        {/* FORGOT PASSWORD FORM */}
+        {/* DIRECT RESET PASSWORD FORM */}
         {mode === 'forgot' && (
           <form onSubmit={handleForgotSubmit}>
             <h3 style={{ fontSize: '18px', marginBottom: '8px' }}>Reset Password</h3>
             <p style={{ fontSize: '12.5px', color: 'var(--steel)', marginBottom: '18px' }}>
-              Enter your registered email and we'll send a 6-digit verification code.
+              Enter your registered email and your new password.
             </p>
 
             <div className="field">
@@ -275,52 +263,6 @@ export const AuthModal = ({ isOpen, onClose, onOpenAdminModal }) => {
                 placeholder="you@email.com"
                 value={forgotEmail}
                 onChange={(e) => setForgotEmail(e.target.value)}
-                required
-              />
-            </div>
-
-            <button
-              type="submit"
-              className="btn btn-primary btn-block"
-              disabled={loading}
-            >
-              {loading ? 'Sending Code...' : 'Send Verification Code →'}
-            </button>
-
-            <div style={{ textAlign: 'center', marginTop: '16px' }}>
-              <button
-                type="button"
-                className="btn btn-ghost btn-sm"
-                onClick={() => setMode('login')}
-              >
-                ← Back to Login
-              </button>
-            </div>
-          </form>
-        )}
-
-        {/* VERIFY OTP & RESET PASSWORD */}
-        {mode === 'reset' && (
-          <form onSubmit={handleResetSubmit}>
-            <h3 style={{ fontSize: '18px', marginBottom: '8px' }}>Enter Verification Code</h3>
-            <p style={{ fontSize: '12.5px', color: 'var(--steel)', marginBottom: '18px' }}>
-              A 6-digit code was sent to <strong>{forgotEmail}</strong> (valid for 10 min).
-            </p>
-
-            <div className="field">
-              <label>6-Digit Verification Code</label>
-              <input
-                type="text"
-                maxLength={6}
-                placeholder="123456"
-                value={otpCode}
-                onChange={(e) => setOtpCode(e.target.value)}
-                style={{
-                  fontSize: '22px',
-                  letterSpacing: '8px',
-                  textAlign: 'center',
-                  fontFamily: 'monospace',
-                }}
                 required
               />
             </div>
@@ -336,28 +278,32 @@ export const AuthModal = ({ isOpen, onClose, onOpenAdminModal }) => {
               />
             </div>
 
+            <div className="field">
+              <label>Confirm New Password</label>
+              <input
+                type="password"
+                placeholder="Confirm new password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                required
+              />
+            </div>
+
             <button
               type="submit"
               className="btn btn-primary btn-block"
               disabled={loading}
             >
-              {loading ? 'Resetting Password...' : 'Reset Password'}
+              {loading ? 'Updating Password...' : 'Update Password →'}
             </button>
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '16px' }}>
-              <button
-                type="button"
-                className="btn btn-ghost btn-sm"
-                onClick={() => setMode('forgot')}
-              >
-                Resend Code
-              </button>
+            <div style={{ textAlign: 'center', marginTop: '16px' }}>
               <button
                 type="button"
                 className="btn btn-ghost btn-sm"
                 onClick={() => setMode('login')}
               >
-                Cancel
+                ← Back to Login
               </button>
             </div>
           </form>

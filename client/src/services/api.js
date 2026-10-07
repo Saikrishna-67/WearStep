@@ -73,11 +73,11 @@ export const api = {
       body: JSON.stringify({ email, otp }),
     }).then(handleResponse),
 
-  resetPassword: (email, otp, newPassword) =>
+  resetPassword: (email, newPassword, otp) =>
     fetch(`${API_BASE}/auth/reset-password`, {
       method: 'POST',
       headers: getHeaders(),
-      body: JSON.stringify({ email, otp, newPassword }),
+      body: JSON.stringify({ email, newPassword, otp }),
     }).then(handleResponse),
 
   // Products

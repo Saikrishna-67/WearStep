@@ -4,9 +4,16 @@ import { api } from '../services/api';
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
   const [token, setToken] = useState(() => localStorage.getItem('wearstep_token'));
-  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState(() => {
+    try {
+      const stored = localStorage.getItem('wearstep_user');
+      return stored ? JSON.parse(stored) : null;
+    } catch {
+      return null;
+    }
+  });
+  const [loading, setLoading] = useState(() => !localStorage.getItem('wearstep_user'));
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -16,6 +23,7 @@ export const AuthProvider = ({ children }) => {
           const res = await api.getMe(storedToken);
           if (res.success && res.user) {
             setUser(res.user);
+            localStorage.setItem('wearstep_user', JSON.stringify(res.user));
           } else {
             logout();
           }
@@ -23,6 +31,9 @@ export const AuthProvider = ({ children }) => {
           console.error('Session check failed:', err);
           logout();
         }
+      } else {
+        setUser(null);
+        localStorage.removeItem('wearstep_user');
       }
       setLoading(false);
     };
@@ -34,6 +45,7 @@ export const AuthProvider = ({ children }) => {
     const res = await api.login(email, password);
     if (res.success && res.token) {
       localStorage.setItem('wearstep_token', res.token);
+      localStorage.setItem('wearstep_user', JSON.stringify(res.user));
       setToken(res.token);
       setUser(res.user);
       return res;
@@ -44,6 +56,7 @@ export const AuthProvider = ({ children }) => {
     const res = await api.register(name, email, password);
     if (res.success && res.token) {
       localStorage.setItem('wearstep_token', res.token);
+      localStorage.setItem('wearstep_user', JSON.stringify(res.user));
       setToken(res.token);
       setUser(res.user);
       return res;
@@ -54,6 +67,7 @@ export const AuthProvider = ({ children }) => {
     const res = await api.adminLogin(email, password);
     if (res.success && res.token) {
       localStorage.setItem('wearstep_token', res.token);
+      localStorage.setItem('wearstep_user', JSON.stringify(res.user));
       setToken(res.token);
       setUser(res.user);
       return res;
@@ -63,13 +77,16 @@ export const AuthProvider = ({ children }) => {
   const updateProfile = async (name) => {
     const res = await api.updateProfile(name);
     if (res.success && res.user) {
-      setUser((prev) => ({ ...prev, name: res.user.name }));
+      const updated = { ...user, name: res.user.name };
+      setUser(updated);
+      localStorage.setItem('wearstep_user', JSON.stringify(updated));
     }
     return res;
   };
 
   const logout = () => {
     localStorage.removeItem('wearstep_token');
+    localStorage.removeItem('wearstep_user');
     setToken(null);
     setUser(null);
   };
@@ -80,6 +97,7 @@ export const AuthProvider = ({ children }) => {
         const res = await api.getMe(token);
         if (res.success && res.user) {
           setUser(res.user);
+          localStorage.setItem('wearstep_user', JSON.stringify(res.user));
         }
       } catch (e) {
         // ignore

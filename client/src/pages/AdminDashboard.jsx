@@ -16,7 +16,7 @@ const CATEGORIES = [
 
 export const AdminDashboard = () => {
   const navigate = useNavigate();
-  const { isAdmin, isLoggedIn, logout } = useAuth();
+  const { isAdmin, isLoggedIn, loading: authLoading, logout } = useAuth();
   const { showToast } = useToast();
 
   const [activeTab, setActiveTab] = useState('dash'); // 'dash' | 'products' | 'orders' | 'customers' | 'coupons' | 'inventory'
@@ -64,13 +64,14 @@ export const AdminDashboard = () => {
   });
 
   useEffect(() => {
+    if (authLoading) return;
     if (!isLoggedIn || !isAdmin) {
       showToast('Admin login required');
       navigate('/');
       return;
     }
     loadAdminData();
-  }, [isLoggedIn, isAdmin]);
+  }, [isLoggedIn, isAdmin, authLoading]);
 
   const loadAdminData = async () => {
     setLoading(true);
