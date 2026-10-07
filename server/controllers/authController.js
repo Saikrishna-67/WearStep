@@ -378,15 +378,22 @@ exports.resetPassword = async (req, res) => {
 // @route   GET /api/auth/email-diagnostic
 // @access  Public
 exports.emailDiagnostic = async (req, res) => {
-  const emailUser = process.env.EMAIL_USER || process.env.SMTP_USER || null;
+  const brevoKey = (process.env.BREVO_API_KEY || '').trim();
+  const resendKey = (process.env.RESEND_API_KEY || '').trim();
+  const emailUser = (process.env.EMAIL_USER || process.env.SMTP_USER || '').trim() || null;
   const emailPassRaw = process.env.EMAIL_PASS || process.env.SMTP_PASS || '';
   const emailPassSet = Boolean(emailPassRaw);
   const emailPassLength = emailPassRaw.length;
+
+  const detectedProvider = brevoKey ? 'brevo (HTTP Port 443)' : resendKey ? 'resend (HTTP Port 443)' : emailPassSet ? 'smtp (Ports 587/465)' : 'none';
 
   const testEmail = req.query.to || emailUser || 'saikrish6901@gmail.com';
   const sendResult = await sendOtpEmail(testEmail, '999888', 'Diagnostic Test');
 
   res.json({
+    detectedProvider,
+    brevoKeySet: Boolean(brevoKey),
+    resendKeySet: Boolean(resendKey),
     emailUser,
     emailPassSet,
     emailPassLength,
