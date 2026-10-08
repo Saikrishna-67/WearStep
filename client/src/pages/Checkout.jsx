@@ -27,8 +27,8 @@ export const Checkout = ({ onOpenAuth }) => {
   // Payment method: 'upi' | 'card' | 'cod'
   const [paymentMethod, setPaymentMethod] = useState('upi');
 
-  // QR Payment 3-minute Countdown (180 seconds)
-  const [qrTimer, setQrTimer] = useState(180);
+  // QR Payment 1-minute Countdown (60 seconds)
+  const [qrTimer, setQrTimer] = useState(60);
 
   // Coupon from cart navigation state
   const [couponCode, setCouponCode] = useState(location.state?.couponCode || '');
@@ -47,7 +47,7 @@ export const Checkout = ({ onOpenAuth }) => {
     }
   }, [isLoggedIn, user]);
 
-  // 3-Minute QR Countdown Timer Effect
+  // 1-Minute QR Countdown Timer Effect
   useEffect(() => {
     let interval = null;
     if (step === 'qr' && qrTimer > 0) {
@@ -55,7 +55,7 @@ export const Checkout = ({ onOpenAuth }) => {
         setQrTimer((prev) => {
           if (prev <= 1) {
             clearInterval(interval);
-            // 3 minutes completed! Automatically verify payment and place order
+            // 1 minute completed! Automatically verify payment and place order
             handleAutoPaymentSuccess();
             return 0;
           }
@@ -109,8 +109,8 @@ export const Checkout = ({ onOpenAuth }) => {
       // Cash on Delivery places immediately
       executeCreateOrder('Cash on Delivery');
     } else {
-      // Online Payment (UPI / Card) -> Show QR Code with 3-minute timer
-      setQrTimer(180); // Reset to 3 minutes (180s)
+      // Online Payment (UPI / Card) -> Show QR Code with 1-minute timer
+      setQrTimer(60); // Reset to 1 minute (60s)
       setStep('qr');
       showToast('Scan the QR code with your UPI app to complete payment');
     }
@@ -451,7 +451,7 @@ export const Checkout = ({ onOpenAuth }) => {
                 />
               </div>
 
-              {/* 3-Minute Live Timer */}
+              {/* 1-Minute Live Timer */}
               <div>
                 <div className="qr-timer-pill">
                   <span className="qr-pulse-dot"></span>
@@ -463,12 +463,12 @@ export const Checkout = ({ onOpenAuth }) => {
               <div className="qr-progress-bar">
                 <div
                   className="qr-progress-fill"
-                  style={{ width: `${((180 - qrTimer) / 180) * 100}%` }}
+                  style={{ width: `${((60 - qrTimer) / 60) * 100}%` }}
                 ></div>
               </div>
 
               <p style={{ fontSize: '12px', color: 'var(--steel)', margin: '8px 0 20px', lineHeight: '1.4' }}>
-                Keep this screen open while paying. Order will automatically confirm once 3 minutes complete or when you tap below.
+                Keep this screen open while paying. Order will automatically confirm once 1 minute completes or when you tap below.
               </p>
 
               {/* Quick Action Buttons */}

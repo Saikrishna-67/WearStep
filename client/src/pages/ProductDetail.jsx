@@ -26,8 +26,6 @@ export const ProductDetail = ({ onOpenAuth }) => {
   // Tab & interactive state
   const [activeTab, setActiveTab] = useState('details'); // 'details' | 'materials' | 'sizing' | 'shipping'
   const [showSizeModal, setShowSizeModal] = useState(false);
-  const [pincode, setPincode] = useState('');
-  const [pincodeResult, setPincodeResult] = useState('');
 
   // Review form
   const [reviewRating, setReviewRating] = useState(5);
@@ -102,19 +100,6 @@ export const ProductDetail = ({ onOpenAuth }) => {
   const handleBuyNow = () => {
     addToCart(product, selectedSize, selectedColor, quantity);
     navigate('/checkout');
-  };
-
-  const handleCheckPincode = (e) => {
-    e.preventDefault();
-    if (!pincode || pincode.trim().length !== 6) {
-      setPincodeResult('Please enter a valid 6-digit Indian PIN code');
-      return;
-    }
-    // Calculate expected delivery date (3 days from now)
-    const d = new Date();
-    d.setDate(d.getDate() + 3);
-    const dateStr = d.toLocaleDateString('en-IN', { weekday: 'short', month: 'short', day: 'numeric' });
-    setPincodeResult(`✓ Delivery available to ${pincode}: Expected by ${dateStr} • Free Shipping on this order • Cash on Delivery supported`);
   };
 
   const handleReviewSubmit = async (e) => {
@@ -357,31 +342,6 @@ export const ProductDetail = ({ onOpenAuth }) => {
               >
                 Buy Now ➔
               </button>
-            </div>
-
-            {/* PINCODE ESTIMATOR */}
-            <div className="pdp-pincode-box">
-              <div className="pdp-pincode-header">
-                <span>📍 Check Delivery & Availability</span>
-              </div>
-              <form onSubmit={handleCheckPincode} className="pdp-pincode-form">
-                <input
-                  type="text"
-                  maxLength={6}
-                  placeholder="Enter 6-digit PIN code (e.g. 500001)"
-                  className="pdp-pincode-input"
-                  value={pincode}
-                  onChange={(e) => setPincode(e.target.value.replace(/[^0-9]/g, ''))}
-                />
-                <button type="submit" className="pdp-pincode-btn">
-                  Check
-                </button>
-              </form>
-              {pincodeResult && (
-                <div className="pdp-pincode-result">
-                  {pincodeResult}
-                </div>
-              )}
             </div>
 
             {/* TRUST BADGES */}
