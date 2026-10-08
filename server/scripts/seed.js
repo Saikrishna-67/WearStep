@@ -458,7 +458,7 @@ async function seedDatabase() {
     // 4. Seed Banners
     await Banner.create([
       {
-        title: 'STEP INTO IT.',
+        title: 'WEAR YOUR STYLE. STEP YOUR WAY.',
         subtitle: 'New drop — Autumn / Winter 01',
         description: 'Clothing and footwear built for people who move. Every stitch tested on real streets, not runways.',
         image: 'https://images.unsplash.com/photo-1516257984-b1b4d707412e?w=700&q=80',

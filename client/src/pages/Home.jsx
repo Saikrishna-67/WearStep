@@ -109,11 +109,9 @@ export const Home = () => {
             <span className="dot"></span> New drop — Autumn / Winter 01
           </div>
           <h1>
-            STEP
+            WEAR YOUR STYLE.
             <br />
-            INTO
-            <br />
-            <span className="outline">IT.</span>
+            <span className="outline">STEP YOUR WAY.</span>
           </h1>
           <p className="hero-sub">
             Clothing and footwear built for people who move. Every stitch tested on real streets, not runways. Free shipping on orders over ₹2000.
