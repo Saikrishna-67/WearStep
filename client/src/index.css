@@ -1939,6 +1939,93 @@ footer {
   background: var(--gold-bright);
 }
 
+/* QR PAYMENT EXPERIENCE */
+.qr-pay-card {
+  text-align: center;
+  padding: 30px 24px;
+  background: #FFFFFF;
+  border: 1px solid rgba(25, 26, 24, 0.1);
+  border-radius: 20px;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.06);
+}
+
+.qr-frame {
+  display: inline-block;
+  padding: 14px;
+  background: #FFFFFF;
+  border: 2px dashed rgba(25, 26, 24, 0.22);
+  border-radius: 18px;
+  margin: 18px 0;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  position: relative;
+}
+
+.qr-frame img {
+  width: 220px;
+  height: 220px;
+  display: block;
+  object-fit: contain;
+  border-radius: 10px;
+}
+
+.qr-amount-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 22px;
+  background: rgba(25, 26, 24, 0.05);
+  border-radius: 100px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 19px;
+  font-weight: 700;
+  color: var(--ink);
+  margin-bottom: 12px;
+}
+
+.qr-timer-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 16px;
+  border-radius: 100px;
+  background: rgba(193, 68, 14, 0.1);
+  color: var(--rust);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.qr-pulse-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--rust);
+  box-shadow: 0 0 0 rgba(193, 68, 14, 0.6);
+  animation: pulseDot 1.4s infinite;
+}
+
+@keyframes pulseDot {
+  0% { transform: scale(0.9); box-shadow: 0 0 0 0 rgba(193, 68, 14, 0.7); }
+  70% { transform: scale(1.1); box-shadow: 0 0 0 8px rgba(193, 68, 14, 0); }
+  100% { transform: scale(0.9); box-shadow: 0 0 0 0 rgba(193, 68, 14, 0); }
+}
+
+.qr-progress-bar {
+  width: 100%;
+  max-width: 320px;
+  height: 6px;
+  background: rgba(25, 26, 24, 0.08);
+  border-radius: 100px;
+  overflow: hidden;
+  margin: 16px auto 8px;
+}
+
+.qr-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--rust), #E67E22);
+  transition: width 1s linear;
+}
+
 .order-review .row {
   display: flex;
   justify-content: space-between;
