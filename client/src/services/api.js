@@ -33,11 +33,11 @@ export const api = {
       body: JSON.stringify({ email, password }),
     }).then(handleResponse),
 
-  register: (name, email, password, securityQuestion, securityAnswer) =>
+  register: (name, email, password, phone = '', recoveryPin = '1234') =>
     fetch(`${API_BASE}/auth/register`, {
       method: 'POST',
       headers: getHeaders(),
-      body: JSON.stringify({ name, email, password, securityQuestion, securityAnswer }),
+      body: JSON.stringify({ name, email, password, phone, recoveryPin, pin: recoveryPin }),
     }).then(handleResponse),
 
   adminLogin: (email, password) =>
@@ -73,11 +73,18 @@ export const api = {
       body: JSON.stringify({ email, otp }),
     }).then(handleResponse),
 
-  resetPassword: (email, securityAnswer, newPassword) =>
+  resetPassword: (identifier, pin, newPassword) =>
     fetch(`${API_BASE}/auth/reset-password`, {
       method: 'POST',
       headers: getHeaders(),
-      body: JSON.stringify({ email, securityAnswer, newPassword }),
+      body: JSON.stringify({
+        email: identifier,
+        identifier,
+        pin,
+        recoveryPin: pin,
+        securityAnswer: pin,
+        newPassword,
+      }),
     }).then(handleResponse),
 
   // Products

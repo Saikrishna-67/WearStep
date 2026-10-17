@@ -47,6 +47,16 @@ const userSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    phone: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    recoveryPin: {
+      type: String,
+      default: '1234',
+      trim: true,
+    },
     securityQuestion: {
       type: String,
       default: 'What is your registered name?',

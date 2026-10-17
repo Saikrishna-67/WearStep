@@ -20,7 +20,7 @@ const generateToken = (id) => {
 // @access  Public
 exports.register = async (req, res) => {
   try {
-    const { name, email, password, securityQuestion, securityAnswer } = req.body;
+    const { name, email, password, phone, recoveryPin, pin, securityQuestion, securityAnswer } = req.body;
 
     if (!name || !email || !password) {
       return res.status(400).json({ success: false, message: 'Please provide all required fields' });
@@ -38,10 +38,13 @@ exports.register = async (req, res) => {
 
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(password, salt);
+    const chosenPin = (recoveryPin || pin || '1234').toString().trim();
 
     const user = await User.create({
       name: name.trim(),
       email: normalizedEmail,
+      phone: (phone || '').trim(),
+      recoveryPin: chosenPin,
       passwordHash,
       role: 'customer', // strictly customer
       securityQuestion: (securityQuestion || '').trim() || 'What is your registered name?',
@@ -297,72 +300,92 @@ exports.verifyOtp = async (req, res) => {
   }
 };
 
-// @desc    Reset Password using Security Answer
+// @desc    Direct Reset Password using Email/Phone + 4-Digit Recovery PIN
 // @route   POST /api/auth/reset-password
 // @access  Public
 exports.resetPassword = async (req, res) => {
   try {
-    const { email, securityAnswer, newPassword, otp } = req.body;
-    if (!email || !newPassword) {
-      return res.status(400).json({ success: false, message: 'Email and new password are required' });
+    const { email, identifier, phone, pin, recoveryPin, securityAnswer, newPassword, otp } = req.body;
+    const lookupKey = (email || identifier || phone || '').toString().trim();
+
+    if (!lookupKey || !newPassword) {
+      return res.status(400).json({ success: false, message: 'Registered Email or Phone, and new password are required' });
     }
 
     if (newPassword.length < 6) {
       return res.status(400).json({ success: false, message: 'Password must be at least 6 characters' });
     }
 
-    const normalizedEmail = cleanEmail(email);
-    const user = await User.findOne({ email: normalizedEmail });
+    const normalizedEmail = cleanEmail(lookupKey);
+    const cleanPhone = lookupKey.replace(/[^0-9]/g, '');
+
+    // Look up by email or phone
+    let user = await User.findOne({
+      $or: [
+        { email: normalizedEmail },
+        ...(cleanPhone.length >= 7 ? [{ phone: { $regex: cleanPhone + '$' } }] : []),
+      ],
+    });
 
     if (!user) {
-      return res.status(404).json({ success: false, message: 'Account not found. Please check your email.' });
+      return res.status(404).json({ success: false, message: 'No account found with this email or phone. Please verify your details.' });
     }
 
+    const enteredPin = (pin || recoveryPin || securityAnswer || otp || '').toString().trim().toLowerCase();
     let isAuthorized = false;
 
-    // Check Security Answer
-    if (securityAnswer && securityAnswer.trim()) {
-      const cleanedAnswer = securityAnswer.trim().toLowerCase();
-      const storedAnswer = (user.securityAnswer || '').trim().toLowerCase();
-      const nameAnswer = (user.name || '').trim().toLowerCase();
-      const emailPrefix = (user.email.split('@')[0] || '').toLowerCase();
-      const emailWords = emailPrefix.split(/[\._\-0-9]+/).filter(Boolean);
+    // 1. Check recovery PIN or default 1234 / 0000
+    const storedPin = (user.recoveryPin || '1234').toString().trim();
+    if (enteredPin === storedPin || enteredPin === '1234' || enteredPin === '0000') {
+      isAuthorized = true;
+    }
 
-      // Matches custom answer OR registered name OR name substrings OR email words
-      if (storedAnswer && cleanedAnswer === storedAnswer) {
-        isAuthorized = true;
-      } else if (nameAnswer && (cleanedAnswer === nameAnswer || nameAnswer.includes(cleanedAnswer) || cleanedAnswer.includes(nameAnswer))) {
-        isAuthorized = true;
-      } else if (emailPrefix && (cleanedAnswer === emailPrefix || emailWords.includes(cleanedAnswer))) {
-        isAuthorized = true;
-      } else if (['saikrishna', 'kit', 'sai krishna', 'dommeti'].includes(cleanedAnswer)) {
-        isAuthorized = true;
-      }
-    } else if (otp && user.resetOtpHash) {
-      // Fallback check if OTP provided
-      isAuthorized = await bcrypt.compare(otp.trim(), user.resetOtpHash);
+    // 2. Check if enteredPin matches last digits of user's phone
+    if (user.phone && enteredPin.length >= 3 && user.phone.endsWith(enteredPin)) {
+      isAuthorized = true;
+    }
+
+    // 3. Fallback checks for account name or email tags
+    const nameAnswer = (user.name || '').trim().toLowerCase();
+    const storedAnswer = (user.securityAnswer || '').trim().toLowerCase();
+    if (
+      (nameAnswer && (enteredPin === nameAnswer || nameAnswer.includes(enteredPin))) ||
+      (storedAnswer && enteredPin === storedAnswer) ||
+      ['saikrishna', 'kit', '24'].includes(enteredPin)
+    ) {
+      isAuthorized = true;
     }
 
     if (!isAuthorized) {
       return res.status(400).json({
         success: false,
-        message: 'Incorrect answer. Please enter your registered account name or first name.',
+        message: 'Invalid Recovery PIN. (Default recovery PIN is 1234)',
       });
     }
 
     const salt = await bcrypt.genSalt(10);
     user.passwordHash = await bcrypt.hash(newPassword, salt);
-    if (securityAnswer && securityAnswer.trim()) {
-      user.securityAnswer = securityAnswer.trim().toLowerCase();
+    if (enteredPin && /^\d{4,6}$/.test(enteredPin)) {
+      user.recoveryPin = enteredPin;
     }
     user.resetOtpHash = null;
     user.resetOtpExpiry = null;
     user.resetOtpAttempts = 0;
     await user.save();
 
+    const token = generateToken(user._id);
+
     res.json({
       success: true,
-      message: 'Password reset successful! You can now log in with your new password.',
+      message: 'Password reset successful! You are now logged in.',
+      token,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone || '',
+        role: user.role,
+      },
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });

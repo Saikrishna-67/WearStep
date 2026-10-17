@@ -49,19 +49,23 @@ const EyeOffIcon = () => (
   </svg>
 );
 
-const SECURITY_QUESTIONS = [
-  'What is your registered name?',
-  'What is your favorite footwear brand?',
-  'What was the name of your first school?',
-  'What is your favorite city?',
-  'What is your childhood nickname?',
-];
+const PhoneIcon = () => (
+  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+  </svg>
+);
+
+const WhatsAppIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+    <path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.816 9.816 0 0 0 12.04 2m.01 1.67c2.2 0 4.26.86 5.82 2.42a8.225 8.225 0 0 1 2.41 5.83c0 4.54-3.7 8.24-8.24 8.24-1.48 0-2.93-.4-4.2-1.15l-.3-.18-3.12.82.83-3.04-.2-.31a8.196 8.196 0 0 1-1.26-4.38c0-4.54 3.7-8.24 8.24-8.24M8.53 7.33c-.2-.01-.43 0-.61.02-.27.03-.5.15-.65.37-.36.52-.94 1.48-.94 2.88 0 1.64 1.15 3.25 1.34 3.5.19.25 2.24 3.47 5.51 4.77 2.37.94 3.32.84 3.92.73.8-.15 1.83-.75 2.09-1.47.26-.72.26-1.34.18-1.47-.08-.13-.3-.21-.63-.37-.33-.16-1.95-.96-2.25-1.07-.3-.11-.52-.16-.74.16-.22.33-.86 1.07-1.05 1.29-.19.22-.38.25-.71.08-.33-.16-1.4-.52-2.67-1.65-.99-.88-1.65-1.96-1.84-2.29-.19-.33-.02-.51.14-.67.15-.15.33-.38.5-.57.17-.19.22-.33.33-.55.11-.22.05-.41-.03-.57-.08-.16-.74-1.78-1.02-2.44-.27-.64-.54-.55-.74-.56z"/>
+  </svg>
+);
 
 export const AuthModal = ({ isOpen, onClose, onOpenAdminModal }) => {
-  const { login, register } = useAuth();
+  const { login, register, resetPassword } = useAuth();
   const { showToast } = useToast();
 
-  const [mode, setMode] = useState('login'); // 'login' | 'register' | 'forgot' | 'reset'
+  const [mode, setMode] = useState('login'); // 'login' | 'register' | 'forgot'
   const [loading, setLoading] = useState(false);
 
   // Password visibility states
@@ -75,15 +79,14 @@ export const AuthModal = ({ isOpen, onClose, onOpenAdminModal }) => {
 
   const [regName, setRegName] = useState('');
   const [regEmail, setRegEmail] = useState('');
+  const [regPhone, setRegPhone] = useState('');
+  const [regPin, setRegPin] = useState('1234');
   const [regPassword, setRegPassword] = useState('');
-  const [regQuestion, setRegQuestion] = useState(SECURITY_QUESTIONS[0]);
-  const [regAnswer, setRegAnswer] = useState('');
 
-  const [forgotEmail, setForgotEmail] = useState('');
-  const [securityQuestion, setSecurityQuestion] = useState('');
-  const [securityAnswer, setSecurityAnswer] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+  const [forgotIdentifier, setForgotIdentifier] = useState('');
+  const [forgotPin, setForgotPin] = useState('1234');
+  const [forgotNewPassword, setForgotNewPassword] = useState('');
+  const [forgotConfirmPassword, setForgotConfirmPassword] = useState('');
 
   if (!isOpen) return null;
 
@@ -135,8 +138,8 @@ export const AuthModal = ({ isOpen, onClose, onOpenAdminModal }) => {
         regName.trim(),
         cleaned,
         regPassword,
-        regQuestion || SECURITY_QUESTIONS[0],
-        (regAnswer || regName).trim()
+        regPhone.trim(),
+        (regPin || '1234').trim()
       );
       showToast(res.message || 'Account created!');
       onClose();
@@ -147,57 +150,29 @@ export const AuthModal = ({ isOpen, onClose, onOpenAdminModal }) => {
     }
   };
 
-  const handleForgotSubmit = async (e) => {
+  const handleDirectReset = async (e) => {
     e.preventDefault();
-    if (!forgotEmail) {
-      showToast('Please enter your email address');
+    if (!forgotIdentifier || !forgotNewPassword || !forgotConfirmPassword) {
+      showToast('Please fill in all fields');
       return;
     }
-    const cleaned = forgotEmail.trim().toLowerCase().replace(/\.{2,}/g, '.');
-    setForgotEmail(cleaned);
-    setLoading(true);
-    try {
-      const res = await api.forgotPassword(cleaned);
-      setSecurityQuestion(res.securityQuestion || 'What is your registered name?');
-      setSecurityAnswer('');
-      setNewPassword('');
-      setConfirmPassword('');
-      showToast(res.message || 'Account located! Please answer your security question.');
-      setMode('reset');
-    } catch (err) {
-      showToast(err.message || 'Could not find account');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleResetSubmit = async (e) => {
-    e.preventDefault();
-    if (!securityAnswer || !newPassword || !confirmPassword) {
-      showToast('Please answer the security question and set your new password');
+    if (forgotNewPassword.length < 6) {
+      showToast('New password must be at least 6 characters');
       return;
     }
-    if (newPassword.length < 6) {
-      showToast('Password must be at least 6 characters');
-      return;
-    }
-    if (newPassword !== confirmPassword) {
+    if (forgotNewPassword !== forgotConfirmPassword) {
       showToast('Passwords do not match');
       return;
     }
-    const cleaned = forgotEmail.trim().toLowerCase().replace(/\.{2,}/g, '.');
+
     setLoading(true);
     try {
-      const res = await api.resetPassword(cleaned, securityAnswer.trim(), newPassword);
-      showToast(res.message || 'Password reset successful! Please log in.');
-      setMode('login');
-      setLoginEmail(cleaned);
-      setLoginPassword('');
-      setSecurityAnswer('');
-      setNewPassword('');
-      setConfirmPassword('');
+      const pinToSend = (forgotPin || '1234').trim();
+      const res = await resetPassword(forgotIdentifier.trim(), pinToSend, forgotNewPassword);
+      showToast(res.message || 'Password reset successful! You are now logged in.');
+      onClose();
     } catch (err) {
-      showToast(err.message || 'Incorrect security answer or reset failed');
+      showToast(err.message || 'Reset failed. Check your email/phone and 4-digit PIN.');
     } finally {
       setLoading(false);
     }
@@ -224,23 +199,17 @@ export const AuthModal = ({ isOpen, onClose, onOpenAdminModal }) => {
             {mode === 'login' && 'Welcome Back'}
             {mode === 'register' && 'Create Account'}
             {mode === 'forgot' && 'Reset Password'}
-            {mode === 'reset' && 'Security Verification'}
           </h3>
 
           <p style={{ fontSize: '13px', color: 'var(--steel)', margin: 0 }}>
             {mode === 'login' && 'Sign in to access your orders, cart & wishlist.'}
             {mode === 'register' && 'Join the streetwear collective with exclusive drops.'}
-            {mode === 'forgot' && 'Enter your registered email to verify your security question.'}
-            {mode === 'reset' && (
-              <>
-                Account: <strong style={{ color: 'var(--ink)' }}>{forgotEmail}</strong>
-              </>
-            )}
+            {mode === 'forgot' && 'Reset in seconds using your registered email or phone and 4-digit PIN.'}
           </p>
         </div>
 
         {/* Segmented Capsule Tabs (Login / Register) */}
-        {mode !== 'forgot' && mode !== 'reset' && (
+        {mode !== 'forgot' && (
           <div className="auth-tabs-segmented">
             <button
               type="button"
@@ -289,7 +258,7 @@ export const AuthModal = ({ isOpen, onClose, onOpenAdminModal }) => {
                   type="button"
                   className="auth-link"
                   onClick={() => {
-                    setForgotEmail(loginEmail);
+                    setForgotIdentifier(loginEmail);
                     setMode('forgot');
                   }}
                 >
@@ -403,6 +372,50 @@ export const AuthModal = ({ isOpen, onClose, onOpenAdminModal }) => {
             </div>
 
             <div className="auth-field">
+              <label className="auth-label">Phone / WhatsApp (Optional)</label>
+              <div className="auth-input-wrapper">
+                <span className="auth-input-icon">
+                  <PhoneIcon />
+                </span>
+                <input
+                  type="tel"
+                  className="auth-input"
+                  placeholder="+91 98765 43210"
+                  value={regPhone}
+                  onChange={(e) => setRegPhone(e.target.value)}
+                  autoComplete="tel"
+                />
+              </div>
+            </div>
+
+            <div className="auth-field">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <label className="auth-label">4-Digit Recovery PIN</label>
+                <span style={{ fontSize: '11px', color: 'var(--rust)', fontWeight: '600' }}>
+                  Default PIN: 1234
+                </span>
+              </div>
+              <div className="auth-input-wrapper">
+                <span className="auth-input-icon">
+                  <KeyIcon />
+                </span>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={6}
+                  className="auth-input"
+                  placeholder="Choose 4-digit PIN (default 1234)"
+                  value={regPin}
+                  onChange={(e) => setRegPin(e.target.value)}
+                  required
+                />
+              </div>
+              <span style={{ display: 'block', fontSize: '11px', color: 'var(--steel)', marginTop: '4px' }}>
+                💡 Remember this 4-digit PIN for instant password recovery anytime.
+              </span>
+            </div>
+
+            <div className="auth-field">
               <label className="auth-label">Password</label>
               <div className="auth-input-wrapper">
                 <span className="auth-input-icon">
@@ -428,36 +441,6 @@ export const AuthModal = ({ isOpen, onClose, onOpenAdminModal }) => {
               </div>
             </div>
 
-            <div className="auth-field">
-              <label className="auth-label">Security Question (For Instant Password Reset)</label>
-              <select
-                className="auth-input"
-                style={{ cursor: 'pointer', paddingRight: '12px' }}
-                value={regQuestion}
-                onChange={(e) => setRegQuestion(e.target.value)}
-              >
-                {SECURITY_QUESTIONS.map((q) => (
-                  <option key={q} value={q}>
-                    {q}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="auth-field">
-              <label className="auth-label">Security Answer</label>
-              <div className="auth-input-wrapper">
-                <input
-                  type="text"
-                  className="auth-input"
-                  placeholder="e.g. your answer"
-                  value={regAnswer}
-                  onChange={(e) => setRegAnswer(e.target.value)}
-                  required
-                />
-              </div>
-            </div>
-
             <button
               type="submit"
               className="auth-btn-submit"
@@ -480,87 +463,53 @@ export const AuthModal = ({ isOpen, onClose, onOpenAdminModal }) => {
         )}
 
         {/* ─────────────────────────────────────────────────────────────
-            STEP 1: REQUEST VERIFICATION CODE
+            FORGOT PASSWORD: FAST 1-STEP RESET WITH PIN / PHONE & WHATSAPP
         ───────────────────────────────────────────────────────────── */}
         {mode === 'forgot' && (
-          <form onSubmit={handleForgotSubmit}>
-            <div className="auth-field" style={{ marginTop: '6px' }}>
-              <label className="auth-label">Registered Account Email</label>
+          <form onSubmit={handleDirectReset}>
+            <div className="auth-field" style={{ marginTop: '4px' }}>
+              <label className="auth-label">Registered Email or Phone</label>
               <div className="auth-input-wrapper">
                 <span className="auth-input-icon">
                   <MailIcon />
                 </span>
                 <input
-                  type="email"
-                  className="auth-input"
-                  placeholder="name@example.com"
-                  value={forgotEmail}
-                  onChange={(e) => setForgotEmail(e.target.value.replace(/\.{2,}/g, '.'))}
-                  autoComplete="email"
-                  required
-                />
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              className="auth-btn-submit"
-              disabled={loading}
-            >
-              {loading ? 'Finding Account...' : 'Continue to Security Question ➔'}
-            </button>
-
-            <div style={{ textAlign: 'center', marginTop: '16px' }}>
-              <button
-                type="button"
-                className="btn btn-ghost btn-sm"
-                onClick={() => setMode('login')}
-              >
-                ← Back to Login
-              </button>
-            </div>
-          </form>
-        )}
-
-        {/* ─────────────────────────────────────────────────────────────
-            STEP 2: ANSWER SECURITY QUESTION & SET NEW PASSWORD
-        ───────────────────────────────────────────────────────────── */}
-        {mode === 'reset' && (
-          <form onSubmit={handleResetSubmit}>
-            {/* SECURITY QUESTION DISPLAY CARD */}
-            <div
-              style={{
-                background: 'rgba(212, 166, 74, 0.12)',
-                border: '1px solid rgba(212, 166, 74, 0.35)',
-                borderRadius: '12px',
-                padding: '14px 16px',
-                margin: '4px 0 16px',
-                textAlign: 'left',
-              }}
-            >
-              <div style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#8A6218', fontWeight: '700', marginBottom: '4px' }}>
-                Security Question for {forgotEmail}
-              </div>
-              <div style={{ fontSize: '15px', fontWeight: '600', color: 'var(--ink)' }}>
-                {securityQuestion || 'What is your registered name?'}
-              </div>
-            </div>
-
-            <div className="auth-field">
-              <label className="auth-label">Your Answer</label>
-              <div className="auth-input-wrapper">
-                <input
                   type="text"
                   className="auth-input"
-                  placeholder="Enter your answer"
-                  value={securityAnswer}
-                  onChange={(e) => setSecurityAnswer(e.target.value)}
+                  placeholder="name@example.com or phone"
+                  value={forgotIdentifier}
+                  onChange={(e) => setForgotIdentifier(e.target.value.replace(/\.{2,}/g, '.'))}
+                  autoComplete="username"
                   autoFocus
                   required
                 />
               </div>
-              <span style={{ display: 'block', fontSize: '11px', color: 'var(--steel)', marginTop: '5px', lineHeight: '1.4' }}>
-                💡 Tip: Enter your registered account name (e.g. &quot;kit&quot; or &quot;saikrishna&quot;) or your chosen security answer.
+            </div>
+
+            <div className="auth-field">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <label className="auth-label">4-Digit Recovery PIN</label>
+                <span style={{ fontSize: '11px', color: 'var(--rust)', fontWeight: '600' }}>
+                  Default PIN: 1234
+                </span>
+              </div>
+              <div className="auth-input-wrapper">
+                <span className="auth-input-icon">
+                  <KeyIcon />
+                </span>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={6}
+                  className="auth-input"
+                  placeholder="Enter 4-digit PIN (default 1234)"
+                  value={forgotPin}
+                  onChange={(e) => setForgotPin(e.target.value)}
+                  required
+                />
+              </div>
+              <span style={{ display: 'block', fontSize: '11px', color: 'var(--steel)', marginTop: '4px' }}>
+                💡 If you haven&apos;t set a custom PIN, use <strong>1234</strong> or your phone&apos;s last 4 digits.
               </span>
             </div>
 
@@ -574,8 +523,8 @@ export const AuthModal = ({ isOpen, onClose, onOpenAdminModal }) => {
                   type={showResetPwd ? 'text' : 'password'}
                   className="auth-input"
                   placeholder="Min 6 characters"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
+                  value={forgotNewPassword}
+                  onChange={(e) => setForgotNewPassword(e.target.value)}
                   required
                 />
                 <button
@@ -599,8 +548,8 @@ export const AuthModal = ({ isOpen, onClose, onOpenAdminModal }) => {
                   type={showResetPwd ? 'text' : 'password'}
                   className="auth-input"
                   placeholder="Re-enter new password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  value={forgotConfirmPassword}
+                  onChange={(e) => setForgotConfirmPassword(e.target.value)}
                   required
                 />
               </div>
@@ -610,9 +559,55 @@ export const AuthModal = ({ isOpen, onClose, onOpenAdminModal }) => {
               type="submit"
               className="auth-btn-submit"
               disabled={loading}
+              style={{ marginTop: '8px' }}
             >
-              {loading ? 'Verifying & Updating...' : 'Reset Password & Sign In ➔'}
+              {loading ? 'Resetting Password...' : 'Reset Password & Sign In ➔'}
             </button>
+
+            {/* WhatsApp Instant Assistance Card */}
+            <div
+              style={{
+                marginTop: '16px',
+                padding: '12px 14px',
+                background: 'rgba(37, 211, 102, 0.08)',
+                border: '1px solid rgba(37, 211, 102, 0.28)',
+                borderRadius: '12px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '10px',
+              }}
+            >
+              <div style={{ textAlign: 'left' }}>
+                <div style={{ fontSize: '12px', fontWeight: '700', color: '#0d7a46', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  <WhatsAppIcon /> Need Direct WhatsApp Help?
+                </div>
+                <div style={{ fontSize: '11px', color: 'var(--steel)', marginTop: '2px' }}>
+                  Message our team directly to reset or unlock your account instantly.
+                </div>
+              </div>
+              <a
+                href={`https://wa.me/919999999999?text=Hi%20WearStep,%20I%20need%20help%20resetting%20my%20password%20for%20account:%20${encodeURIComponent(forgotIdentifier || '')}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  padding: '7px 12px',
+                  background: '#25D366',
+                  color: '#ffffff',
+                  fontSize: '11px',
+                  fontWeight: '700',
+                  borderRadius: '8px',
+                  textDecoration: 'none',
+                  whiteSpace: 'nowrap',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  boxShadow: '0 2px 6px rgba(37, 211, 102, 0.3)',
+                }}
+              >
+                WhatsApp ➔
+              </a>
+            </div>
 
             <div style={{ textAlign: 'center', marginTop: '16px' }}>
               <button
