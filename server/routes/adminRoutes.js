@@ -9,6 +9,8 @@ const {
   getAdminOrders,
   updateOrderStatus,
   getCustomers,
+  toggleCustomerAccess,
+  regenerateCustomerKey,
   getCoupons,
   createCoupon,
   deleteCoupon,
@@ -27,6 +29,8 @@ router.delete('/products/:id', deleteProduct);
 router.get('/orders', getAdminOrders);
 router.put('/orders/:id/status', updateOrderStatus);
 router.get('/customers', getCustomers);
+router.put('/customers/:id/access', toggleCustomerAccess);
+router.post('/customers/:id/regenerate-key', regenerateCustomerKey);
 router.get('/coupons', getCoupons);
 router.post('/coupons', createCoupon);
 router.delete('/coupons/:id', deleteCoupon);

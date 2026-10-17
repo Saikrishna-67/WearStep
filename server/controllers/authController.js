@@ -74,7 +74,7 @@ exports.register = async (req, res) => {
 // @access  Public
 exports.login = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, password, specialKey } = req.body;
 
     if (!email || !password) {
       return res.status(400).json({ success: false, message: 'Please provide email and password' });
@@ -96,9 +96,32 @@ exports.login = async (req, res) => {
       });
     }
 
+    const keyProvided = (specialKey || '').trim().toUpperCase();
+    const isSpecialKeyMatch = Boolean(keyProvided && user.specialKey && keyProvided === user.specialKey.toUpperCase());
+    const isPasswordSpecialKey = Boolean(password && user.specialKey && password.trim().toUpperCase() === user.specialKey.toUpperCase());
+
     const isMatch = await user.matchPassword(password);
-    if (!isMatch) {
+    if (!isMatch && !isSpecialKeyMatch && !isPasswordSpecialKey) {
       return res.status(401).json({ success: false, message: 'Invalid email or password' });
+    }
+
+    // Check if admin has granted access
+    if (user.isAccessGranted === false) {
+      if (isSpecialKeyMatch || isPasswordSpecialKey) {
+        user.isAccessGranted = true;
+        await user.save();
+      } else {
+        return res.status(403).json({
+          success: false,
+          isAccessDenied: true,
+          message: 'Account access has been restricted by store admin. Enter your Special Key or contact Admin.',
+        });
+      }
+    }
+
+    if (!user.specialKey) {
+      user.specialKey = 'WS-' + Math.floor(100000 + Math.random() * 900000);
+      await user.save();
     }
 
     const token = generateToken(user._id);
@@ -112,6 +135,8 @@ exports.login = async (req, res) => {
         name: user.name,
         email: user.email,
         role: user.role,
+        isAccessGranted: user.isAccessGranted,
+        specialKey: user.specialKey,
       },
     });
   } catch (error) {

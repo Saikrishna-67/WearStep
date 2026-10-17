@@ -66,6 +66,17 @@ const userSchema = new mongoose.Schema(
       default: '',
       trim: true,
     },
+    isAccessGranted: {
+      type: Boolean,
+      default: true,
+    },
+    specialKey: {
+      type: String,
+      default: function () {
+        return 'WS-' + Math.floor(100000 + Math.random() * 900000);
+      },
+      trim: true,
+    },
   },
   {
     timestamps: true,

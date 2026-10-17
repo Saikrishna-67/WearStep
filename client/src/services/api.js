@@ -26,11 +26,11 @@ const handleResponse = async (response) => {
 
 export const api = {
   // Auth
-  login: (email, password) =>
+  login: (email, password, specialKey = '') =>
     fetch(`${API_BASE}/auth/login`, {
       method: 'POST',
       headers: getHeaders(),
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ email, password, specialKey }),
     }).then(handleResponse),
 
   register: (name, email, password, phone = '', recoveryPin = '1234') =>
@@ -210,6 +210,19 @@ export const api = {
 
   getCustomers: () =>
     fetch(`${API_BASE}/admin/customers`, {
+      headers: getHeaders(),
+    }).then(handleResponse),
+
+  toggleCustomerAccess: (id, isAccessGranted) =>
+    fetch(`${API_BASE}/admin/customers/${id}/access`, {
+      method: 'PUT',
+      headers: getHeaders(),
+      body: JSON.stringify(isAccessGranted !== undefined ? { isAccessGranted } : {}),
+    }).then(handleResponse),
+
+  regenerateCustomerKey: (id) =>
+    fetch(`${API_BASE}/admin/customers/${id}/regenerate-key`, {
+      method: 'POST',
       headers: getHeaders(),
     }).then(handleResponse),
 

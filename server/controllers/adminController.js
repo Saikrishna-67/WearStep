@@ -247,6 +247,7 @@ exports.updateOrderStatus = async (req, res) => {
 };
 
 // @desc    Admin: get customers with order counts and spend
+// @desc    Admin: get customers with special access keys and order counts
 // @route   GET /api/admin/customers
 // @access  Private/Admin
 exports.getCustomers = async (req, res) => {
@@ -257,6 +258,13 @@ exports.getCustomers = async (req, res) => {
 
     const customerData = await Promise.all(
       customers.map(async (c) => {
+        // Ensure every customer has a special key if not already set
+        if (!c.specialKey) {
+          c.specialKey = 'WS-' + Math.floor(100000 + Math.random() * 900000);
+          c.isAccessGranted = c.isAccessGranted !== false;
+          await c.save();
+        }
+
         const userOrders = await Order.find({ user: c._id });
         const spend = userOrders
           .filter((o) => o.orderStatus !== 'Cancelled')
@@ -266,6 +274,10 @@ exports.getCustomers = async (req, res) => {
           id: c._id,
           name: c.name,
           email: c.email,
+          phone: c.phone || '',
+          isAccessGranted: c.isAccessGranted !== false,
+          specialKey: c.specialKey,
+          recoveryPin: c.recoveryPin || '1234',
           orderCount: userOrders.length,
           totalSpend: spend,
           createdAt: c.createdAt,
@@ -277,6 +289,69 @@ exports.getCustomers = async (req, res) => {
       success: true,
       count: customerData.length,
       customers: customerData,
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Admin: Toggle or set customer login access
+// @route   PUT /api/admin/customers/:id/access
+// @access  Private/Admin
+exports.toggleCustomerAccess = async (req, res) => {
+  try {
+    const customer = await User.findById(req.params.id);
+    if (!customer) {
+      return res.status(404).json({ success: false, message: 'Customer not found' });
+    }
+
+    if (req.body.isAccessGranted !== undefined) {
+      customer.isAccessGranted = req.body.isAccessGranted;
+    } else {
+      customer.isAccessGranted = !customer.isAccessGranted;
+    }
+
+    if (!customer.specialKey) {
+      customer.specialKey = 'WS-' + Math.floor(100000 + Math.random() * 900000);
+    }
+
+    await customer.save();
+
+    res.json({
+      success: true,
+      message: customer.isAccessGranted
+        ? `Login access granted for ${customer.name}`
+        : `Login access revoked for ${customer.name}`,
+      customer: {
+        id: customer._id,
+        name: customer.name,
+        email: customer.email,
+        isAccessGranted: customer.isAccessGranted,
+        specialKey: customer.specialKey,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Admin: Regenerate customer special access key
+// @route   POST /api/admin/customers/:id/regenerate-key
+// @access  Private/Admin
+exports.regenerateCustomerKey = async (req, res) => {
+  try {
+    const customer = await User.findById(req.params.id);
+    if (!customer) {
+      return res.status(404).json({ success: false, message: 'Customer not found' });
+    }
+
+    customer.specialKey = 'WS-' + Math.floor(100000 + Math.random() * 900000);
+    await customer.save();
+
+    res.json({
+      success: true,
+      message: `New special access key generated for ${customer.name}`,
+      specialKey: customer.specialKey,
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });

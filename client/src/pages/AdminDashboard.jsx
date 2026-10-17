@@ -229,6 +229,26 @@ export const AdminDashboard = () => {
     }
   };
 
+  const handleToggleAccess = async (customerId, currentStatus) => {
+    try {
+      const res = await api.toggleCustomerAccess(customerId, !currentStatus);
+      showToast(res.message || 'Customer login access updated');
+      loadAdminData();
+    } catch (err) {
+      showToast(err.message || 'Error updating customer access');
+    }
+  };
+
+  const handleRegenerateKey = async (customerId) => {
+    try {
+      const res = await api.regenerateCustomerKey(customerId);
+      showToast(res.message || 'New special key generated');
+      loadAdminData();
+    } catch (err) {
+      showToast(err.message || 'Error generating special key');
+    }
+  };
+
   if (loading) {
     return (
       <div style={{ textAlign: 'center', padding: '100px 20px' }}>
@@ -619,29 +639,182 @@ export const AdminDashboard = () => {
           </div>
         )}
 
-        {/* TAB 4: CUSTOMERS */}
+        {/* TAB 4: CUSTOMERS & ACCESS CONTROL */}
         {activeTab === 'customers' && (
-          <div className="admin-table-wrap">
-            <table className="admin-table">
-              <thead>
-                <tr>
-                  <th>Customer Name</th>
-                  <th>Email</th>
-                  <th>Total Orders</th>
-                  <th>Total Spend</th>
-                </tr>
-              </thead>
-              <tbody>
-                {customers.map((c) => (
-                  <tr key={c.id}>
-                    <td><strong>{c.name}</strong></td>
-                    <td>{c.email}</td>
-                    <td>{c.orderCount}</td>
-                    <td>{fmt(c.totalSpend)}</td>
+          <div>
+            <div className="admin-actions-row" style={{ marginBottom: '18px' }}>
+              <div>
+                <h3 style={{ fontSize: '18px', margin: '0 0 4px', color: 'var(--ink)' }}>
+                  Customer Accounts &amp; Login Access
+                </h3>
+                <span className="mono" style={{ fontSize: '12px', color: 'var(--steel)' }}>
+                  Grant or revoke login access. Every customer account is protected with an Admin Special Key.
+                </span>
+              </div>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <span
+                  style={{
+                    padding: '6px 12px',
+                    borderRadius: '20px',
+                    background: 'rgba(21, 128, 61, 0.1)',
+                    color: '#15803d',
+                    fontSize: '12px',
+                    fontWeight: '700',
+                  }}
+                >
+                  {customers.filter((c) => c.isAccessGranted !== false).length} / {customers.length} Logins Granted
+                </span>
+              </div>
+            </div>
+
+            <div className="admin-table-wrap">
+              <table className="admin-table">
+                <thead>
+                  <tr>
+                    <th>Customer</th>
+                    <th>Email &amp; Phone</th>
+                    <th>Special Access Key</th>
+                    <th>Login Status</th>
+                    <th>Orders &amp; Spend</th>
+                    <th>Access Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {customers.map((c) => {
+                    const isGranted = c.isAccessGranted !== false;
+                    return (
+                      <tr key={c.id}>
+                        <td>
+                          <strong>{c.name}</strong>
+                          <div style={{ fontSize: '11px', color: 'var(--steel)', marginTop: '2px' }}>
+                            Joined {new Date(c.createdAt).toLocaleDateString()}
+                          </div>
+                        </td>
+                        <td>
+                          <div>{c.email}</div>
+                          {c.phone && (
+                            <div style={{ fontSize: '11px', color: 'var(--steel)', marginTop: '2px' }}>
+                              📱 {c.phone}
+                            </div>
+                          )}
+                        </td>
+                        <td>
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                            <code
+                              style={{
+                                background: 'rgba(212, 166, 74, 0.12)',
+                                border: '1px solid rgba(212, 166, 74, 0.35)',
+                                color: '#8A6218',
+                                padding: '4px 8px',
+                                borderRadius: '6px',
+                                fontSize: '12px',
+                                fontWeight: '700',
+                                letterSpacing: '0.04em',
+                              }}
+                            >
+                              {c.specialKey || 'WS-PENDING'}
+                            </code>
+                            <button
+                              type="button"
+                              title="Copy Special Key"
+                              onClick={() => {
+                                navigator.clipboard.writeText(c.specialKey);
+                                showToast(`Copied Special Key: ${c.specialKey}`);
+                              }}
+                              style={{
+                                background: 'none',
+                                border: '1px solid rgba(25, 26, 24, 0.2)',
+                                borderRadius: '4px',
+                                cursor: 'pointer',
+                                padding: '3px 7px',
+                                fontSize: '11px',
+                              }}
+                            >
+                              📋
+                            </button>
+                            <button
+                              type="button"
+                              title="Regenerate New Key"
+                              onClick={() => handleRegenerateKey(c.id)}
+                              style={{
+                                background: 'none',
+                                border: '1px solid rgba(25, 26, 24, 0.2)',
+                                borderRadius: '4px',
+                                cursor: 'pointer',
+                                padding: '3px 7px',
+                                fontSize: '11px',
+                              }}
+                            >
+                              🔄
+                            </button>
+                          </div>
+                        </td>
+                        <td>
+                          {isGranted ? (
+                            <span
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '5px',
+                                padding: '4px 10px',
+                                borderRadius: '12px',
+                                fontSize: '11px',
+                                fontWeight: '700',
+                                background: 'rgba(21, 128, 61, 0.12)',
+                                color: '#15803d',
+                              }}
+                            >
+                              <span style={{ fontSize: '8px' }}>●</span> Granted
+                            </span>
+                          ) : (
+                            <span
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '5px',
+                                padding: '4px 10px',
+                                borderRadius: '12px',
+                                fontSize: '11px',
+                                fontWeight: '700',
+                                background: 'rgba(185, 28, 28, 0.12)',
+                                color: '#b91c1c',
+                              }}
+                            >
+                              <span style={{ fontSize: '8px' }}>●</span> Revoked
+                            </span>
+                          )}
+                        </td>
+                        <td>
+                          <div><strong>{c.orderCount}</strong> orders</div>
+                          <div style={{ fontSize: '11px', color: 'var(--steel)' }}>{fmt(c.totalSpend)}</div>
+                        </td>
+                        <td>
+                          {isGranted ? (
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-ghost"
+                              style={{ color: '#b91c1c', border: '1px solid rgba(185, 28, 28, 0.35)' }}
+                              onClick={() => handleToggleAccess(c.id, true)}
+                            >
+                              Revoke Access ✕
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-primary"
+                              style={{ background: '#15803d', borderColor: '#15803d', color: '#fff' }}
+                              onClick={() => handleToggleAccess(c.id, false)}
+                            >
+                              Grant Access ✓
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
 

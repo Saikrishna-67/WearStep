@@ -76,6 +76,8 @@ export const AuthModal = ({ isOpen, onClose, onOpenAdminModal }) => {
   // Forms state
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
+  const [loginSpecialKey, setLoginSpecialKey] = useState('');
+  const [showSpecialKeyInput, setShowSpecialKeyInput] = useState(false);
 
   const [regName, setRegName] = useState('');
   const [regEmail, setRegEmail] = useState('');
@@ -105,7 +107,7 @@ export const AuthModal = ({ isOpen, onClose, onOpenAdminModal }) => {
     const cleaned = loginEmail.trim().toLowerCase().replace(/\.{2,}/g, '.');
     setLoading(true);
     try {
-      const res = await login(cleaned, loginPassword);
+      const res = await login(cleaned, loginPassword, loginSpecialKey.trim());
       showToast(res.message || 'Logged in successfully');
       onClose();
     } catch (err) {
@@ -113,6 +115,9 @@ export const AuthModal = ({ isOpen, onClose, onOpenAdminModal }) => {
         showToast('Admin account detected — opening Admin Login');
         onClose();
         if (onOpenAdminModal) onOpenAdminModal();
+      } else if (err.data && err.data.isAccessDenied) {
+        setShowSpecialKeyInput(true);
+        showToast('Login access restricted by Admin. Enter your Special Key.');
       } else {
         showToast(err.message || 'Login failed');
       }
@@ -288,6 +293,57 @@ export const AuthModal = ({ isOpen, onClose, onOpenAdminModal }) => {
                 </button>
               </div>
             </div>
+
+            {/* Special Access Key Field (Visible if access denied or toggled) */}
+            {showSpecialKeyInput ? (
+              <div className="auth-field" style={{ marginTop: '10px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <label className="auth-label" style={{ color: 'var(--rust)', fontWeight: '700' }}>
+                    🔑 Admin Special Access Key
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setShowSpecialKeyInput(false)}
+                    style={{ background: 'none', border: 'none', fontSize: '11px', color: 'var(--steel)', cursor: 'pointer' }}
+                  >
+                    Hide
+                  </button>
+                </div>
+                <div className="auth-input-wrapper">
+                  <span className="auth-input-icon">
+                    <KeyIcon />
+                  </span>
+                  <input
+                    type="text"
+                    className="auth-input"
+                    placeholder="e.g. WS-482910"
+                    value={loginSpecialKey}
+                    onChange={(e) => setLoginSpecialKey(e.target.value.toUpperCase())}
+                    autoFocus
+                  />
+                </div>
+                <span style={{ display: 'block', fontSize: '11px', color: 'var(--steel)', marginTop: '4px' }}>
+                  💡 Enter your account&apos;s Special Key to unlock access granted by admin.
+                </span>
+              </div>
+            ) : (
+              <div style={{ textAlign: 'right', marginTop: '-6px', marginBottom: '8px' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowSpecialKeyInput(true)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    fontSize: '11px',
+                    color: 'var(--steel)',
+                    textDecoration: 'underline',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Have an Admin Special Key?
+                </button>
+              </div>
+            )}
 
             <button
               type="submit"
