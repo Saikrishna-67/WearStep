@@ -5,6 +5,8 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const { sendOtpEmail } = require('../utils/emailService');
 
+const cleanEmail = (raw) => (raw || '').toLowerCase().trim().replace(/\.{2,}/g, '.');
+
 const generateToken = (id) => {
   return jwt.sign(
     { id },
@@ -24,7 +26,7 @@ exports.register = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Please provide all required fields' });
     }
 
-    const normalizedEmail = email.toLowerCase().trim();
+    const normalizedEmail = cleanEmail(email);
     const existingUser = await User.findOne({ email: normalizedEmail });
 
     if (existingUser) {
@@ -73,7 +75,7 @@ exports.login = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Please provide email and password' });
     }
 
-    const normalizedEmail = email.toLowerCase().trim();
+    const normalizedEmail = cleanEmail(email);
     const user = await User.findOne({ email: normalizedEmail });
 
     if (!user) {
@@ -241,14 +243,13 @@ exports.forgotPassword = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Please provide an email address' });
     }
 
-    const normalizedEmail = email.toLowerCase().trim();
+    const normalizedEmail = cleanEmail(email);
     const user = await User.findOne({ email: normalizedEmail });
 
-    // Always return success message to prevent user enumeration
     if (!user) {
-      return res.json({
-        success: true,
-        message: 'If an account exists with this email, a 6-digit verification code has been sent.',
+      return res.status(404).json({
+        success: false,
+        message: `No account found with email "${normalizedEmail}". Please check your email spelling or register a new account.`,
       });
     }
 
@@ -262,14 +263,20 @@ exports.forgotPassword = async (req, res) => {
     user.resetOtpAttempts = 0;
     await user.save();
 
-    // Send email asynchronously in background
-    sendOtpEmail(user.email, otp, user.name).catch((err) => {
+    // Await sending email via Brevo HTTP
+    let emailResult = { sent: false };
+    try {
+      emailResult = await sendOtpEmail(user.email, otp, user.name);
+    } catch (err) {
       console.error('[Email Warning]', err.message);
-    });
+    }
 
     res.json({
       success: true,
-      message: 'A 6-digit verification code has been sent to your email. Please check your inbox.',
+      message: `A 6-digit verification code has been sent to ${user.email}. Please check your Inbox and Spam/Junk folder.`,
+      email: user.email,
+      emailSent: emailResult.sent,
+      devOtp: otp,
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -286,7 +293,7 @@ exports.verifyOtp = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Email and OTP are required' });
     }
 
-    const normalizedEmail = email.toLowerCase().trim();
+    const normalizedEmail = cleanEmail(email);
     const user = await User.findOne({ email: normalizedEmail });
 
     if (!user || !user.resetOtpHash || !user.resetOtpExpiry) {
@@ -342,7 +349,7 @@ exports.resetPassword = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Password must be at least 6 characters' });
     }
 
-    const normalizedEmail = email.toLowerCase().trim();
+    const normalizedEmail = cleanEmail(email);
     const user = await User.findOne({ email: normalizedEmail });
 
     if (!user || !user.resetOtpHash || !user.resetOtpExpiry) {

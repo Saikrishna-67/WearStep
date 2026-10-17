@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { api } from '../services/api';
@@ -73,6 +73,15 @@ export const AuthModal = ({ isOpen, onClose, onOpenAdminModal }) => {
   const [otpCode, setOtpCode] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [devOtp, setDevOtp] = useState('');
+  const [resendCooldown, setResendCooldown] = useState(0);
+
+  useEffect(() => {
+    if (resendCooldown > 0) {
+      const timer = setTimeout(() => setResendCooldown((c) => c - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [resendCooldown]);
 
   if (!isOpen) return null;
 
@@ -88,9 +97,10 @@ export const AuthModal = ({ isOpen, onClose, onOpenAdminModal }) => {
       showToast('Please enter both email and password');
       return;
     }
+    const cleaned = loginEmail.trim().toLowerCase().replace(/\.{2,}/g, '.');
     setLoading(true);
     try {
-      const res = await login(loginEmail, loginPassword);
+      const res = await login(cleaned, loginPassword);
       showToast(res.message || 'Logged in successfully');
       onClose();
     } catch (err) {
@@ -116,9 +126,10 @@ export const AuthModal = ({ isOpen, onClose, onOpenAdminModal }) => {
       showToast('Password must be at least 6 characters');
       return;
     }
+    const cleaned = regEmail.trim().toLowerCase().replace(/\.{2,}/g, '.');
     setLoading(true);
     try {
-      const res = await register(regName, regEmail, regPassword);
+      const res = await register(regName.trim(), cleaned, regPassword);
       showToast(res.message || 'Account created!');
       onClose();
     } catch (err) {
@@ -134,14 +145,38 @@ export const AuthModal = ({ isOpen, onClose, onOpenAdminModal }) => {
       showToast('Please enter your email address');
       return;
     }
+    const cleaned = forgotEmail.trim().toLowerCase().replace(/\.{2,}/g, '.');
+    setForgotEmail(cleaned);
     setLoading(true);
     try {
-      const res = await api.forgotPassword(forgotEmail);
-      showToast(res.message || 'Verification code sent to your email!');
+      const res = await api.forgotPassword(cleaned);
+      if (res.devOtp) {
+        setDevOtp(res.devOtp);
+      }
+      showToast(res.message || 'Verification code sent! Check inbox & spam.');
       setOtpCode('');
+      setResendCooldown(30);
       setMode('reset');
     } catch (err) {
       showToast(err.message || 'Could not send verification code');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResendCode = async () => {
+    if (resendCooldown > 0) return;
+    const cleaned = forgotEmail.trim().toLowerCase().replace(/\.{2,}/g, '.');
+    setLoading(true);
+    try {
+      const res = await api.forgotPassword(cleaned);
+      if (res.devOtp) {
+        setDevOtp(res.devOtp);
+      }
+      showToast('New verification code sent! Check inbox & spam.');
+      setResendCooldown(30);
+    } catch (err) {
+      showToast(err.message || 'Failed to resend verification code');
     } finally {
       setLoading(false);
     }
@@ -161,16 +196,18 @@ export const AuthModal = ({ isOpen, onClose, onOpenAdminModal }) => {
       showToast('Passwords do not match');
       return;
     }
+    const cleaned = forgotEmail.trim().toLowerCase().replace(/\.{2,}/g, '.');
     setLoading(true);
     try {
-      const res = await api.resetPassword(forgotEmail, otpCode, newPassword);
+      const res = await api.resetPassword(cleaned, otpCode.trim(), newPassword);
       showToast(res.message || 'Password reset successful! Please log in.');
       setMode('login');
-      setLoginEmail(forgotEmail);
+      setLoginEmail(cleaned);
       setLoginPassword('');
       setOtpCode('');
       setNewPassword('');
       setConfirmPassword('');
+      setDevOtp('');
     } catch (err) {
       showToast(err.message || 'Invalid verification code or reset failed');
     } finally {
@@ -440,7 +477,7 @@ export const AuthModal = ({ isOpen, onClose, onOpenAdminModal }) => {
                   className="auth-input"
                   placeholder="name@example.com"
                   value={forgotEmail}
-                  onChange={(e) => setForgotEmail(e.target.value)}
+                  onChange={(e) => setForgotEmail(e.target.value.replace(/\.{2,}/g, '.'))}
                   autoComplete="email"
                   required
                 />
@@ -472,6 +509,28 @@ export const AuthModal = ({ isOpen, onClose, onOpenAdminModal }) => {
         ───────────────────────────────────────────────────────────── */}
         {mode === 'reset' && (
           <form onSubmit={handleResetSubmit}>
+            {/* SPAM / INBOX ALERT */}
+            <div
+              style={{
+                background: 'rgba(212, 166, 74, 0.12)',
+                border: '1px solid rgba(212, 166, 74, 0.35)',
+                borderRadius: '12px',
+                padding: '12px 14px',
+                margin: '4px 0 16px',
+                fontSize: '12px',
+                color: '#8A6218',
+                lineHeight: '1.45',
+                textAlign: 'left',
+              }}
+            >
+              <div style={{ fontWeight: '700', marginBottom: '3px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span>📬</span> Check Inbox &amp; Spam / Junk Folder
+              </div>
+              <div>
+                Institutional mail accounts (such as <strong>@sasi.ac.in</strong>) or Gmail frequently deliver automated security codes to your <strong>Spam / Junk</strong> folder.
+              </div>
+            </div>
+
             <div className="auth-field" style={{ marginTop: '6px' }}>
               <label className="auth-label" style={{ textAlign: 'center', display: 'block', marginBottom: '8px' }}>
                 6-Digit Verification Code
@@ -487,9 +546,44 @@ export const AuthModal = ({ isOpen, onClose, onOpenAdminModal }) => {
                 required
               />
               <span style={{ display: 'block', textAlign: 'center', fontSize: '11px', color: 'var(--steel)', marginTop: '6px' }}>
-                Enter the 6 digits sent to your email inbox
+                Enter the 6 digits sent to your email inbox or spam folder
               </span>
             </div>
+
+            {/* Instant Fallback Reveal if College Server Delays Email */}
+            {devOtp && (
+              <div
+                style={{
+                  background: 'rgba(25, 26, 24, 0.04)',
+                  border: '1px dashed rgba(25, 26, 24, 0.25)',
+                  borderRadius: '10px',
+                  padding: '10px 14px',
+                  marginBottom: '16px',
+                  fontSize: '12px',
+                  textAlign: 'center',
+                  color: 'var(--ink)',
+                }}
+              >
+                <span>Didn't receive email in inbox or spam? </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOtpCode(devOtp);
+                    showToast('Verification code auto-filled!');
+                  }}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: 'var(--rust)',
+                    fontWeight: '700',
+                    cursor: 'pointer',
+                    textDecoration: 'underline',
+                  }}
+                >
+                  Click to auto-fill code ({devOtp})
+                </button>
+              </div>
+            )}
 
             <div className="auth-field">
               <label className="auth-label">New Password</label>
@@ -541,18 +635,21 @@ export const AuthModal = ({ isOpen, onClose, onOpenAdminModal }) => {
               {loading ? 'Verifying...' : 'Set New Password ➔'}
             </button>
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '16px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '16px', gap: '10px' }}>
               <button
                 type="button"
                 className="btn btn-ghost btn-sm"
-                onClick={() => setMode('forgot')}
+                onClick={handleResendCode}
+                disabled={resendCooldown > 0 || loading}
+                style={{ flex: 1 }}
               >
-                Resend Code
+                {resendCooldown > 0 ? `Resend (${resendCooldown}s)` : 'Resend Code'}
               </button>
               <button
                 type="button"
                 className="btn btn-ghost btn-sm"
                 onClick={() => setMode('login')}
+                style={{ flex: 1 }}
               >
                 ← Back to Login
               </button>
