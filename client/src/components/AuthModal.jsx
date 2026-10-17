@@ -560,7 +560,7 @@ export const AuthModal = ({ isOpen, onClose, onOpenAdminModal }) => {
                 />
               </div>
               <span style={{ display: 'block', fontSize: '11px', color: 'var(--steel)', marginTop: '5px', lineHeight: '1.4' }}>
-                💡 Tip: If you registered before setting a custom question, your registered account name is accepted.
+                💡 Tip: Enter your registered account name (e.g. &quot;kit&quot; or &quot;saikrishna&quot;) or your chosen security answer.
               </span>
             </div>
 

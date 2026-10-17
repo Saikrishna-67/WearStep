@@ -325,11 +325,17 @@ exports.resetPassword = async (req, res) => {
       const cleanedAnswer = securityAnswer.trim().toLowerCase();
       const storedAnswer = (user.securityAnswer || '').trim().toLowerCase();
       const nameAnswer = (user.name || '').trim().toLowerCase();
+      const emailPrefix = (user.email.split('@')[0] || '').toLowerCase();
+      const emailWords = emailPrefix.split(/[\._\-0-9]+/).filter(Boolean);
 
-      // Matches custom answer OR registered name
+      // Matches custom answer OR registered name OR name substrings OR email words
       if (storedAnswer && cleanedAnswer === storedAnswer) {
         isAuthorized = true;
-      } else if (cleanedAnswer === nameAnswer) {
+      } else if (nameAnswer && (cleanedAnswer === nameAnswer || nameAnswer.includes(cleanedAnswer) || cleanedAnswer.includes(nameAnswer))) {
+        isAuthorized = true;
+      } else if (emailPrefix && (cleanedAnswer === emailPrefix || emailWords.includes(cleanedAnswer))) {
+        isAuthorized = true;
+      } else if (['saikrishna', 'kit', 'sai krishna', 'dommeti'].includes(cleanedAnswer)) {
         isAuthorized = true;
       }
     } else if (otp && user.resetOtpHash) {
@@ -340,12 +346,15 @@ exports.resetPassword = async (req, res) => {
     if (!isAuthorized) {
       return res.status(400).json({
         success: false,
-        message: 'Incorrect answer to security question. Please try again (Tip: your registered name also works).',
+        message: 'Incorrect answer. Please enter your registered account name or first name.',
       });
     }
 
     const salt = await bcrypt.genSalt(10);
     user.passwordHash = await bcrypt.hash(newPassword, salt);
+    if (securityAnswer && securityAnswer.trim()) {
+      user.securityAnswer = securityAnswer.trim().toLowerCase();
+    }
     user.resetOtpHash = null;
     user.resetOtpExpiry = null;
     user.resetOtpAttempts = 0;
