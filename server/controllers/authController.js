@@ -20,7 +20,7 @@ const generateToken = (id) => {
 // @access  Public
 exports.register = async (req, res) => {
   try {
-    const { name, email, password } = req.body;
+    const { name, email, password, securityQuestion, securityAnswer } = req.body;
 
     if (!name || !email || !password) {
       return res.status(400).json({ success: false, message: 'Please provide all required fields' });
@@ -44,6 +44,8 @@ exports.register = async (req, res) => {
       email: normalizedEmail,
       passwordHash,
       role: 'customer', // strictly customer
+      securityQuestion: (securityQuestion || '').trim() || 'What is your registered name?',
+      securityAnswer: ((securityAnswer || '').trim() || name.trim()).toLowerCase(),
     });
 
     const token = generateToken(user._id);
@@ -235,6 +237,8 @@ exports.updateProfile = async (req, res) => {
 
 // @desc    Initiate Forgot Password - generate 6-digit OTP
 // @route   POST /api/auth/forgot-password
+// @desc    Initiate Forgot Password - retrieve security question
+// @route   POST /api/auth/forgot-password
 // @access  Public
 exports.forgotPassword = async (req, res) => {
   try {
@@ -253,37 +257,21 @@ exports.forgotPassword = async (req, res) => {
       });
     }
 
-    // Generate secure 6-digit OTP
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    const salt = await bcrypt.genSalt(10);
-    const otpHash = await bcrypt.hash(otp, salt);
-
-    user.resetOtpHash = otpHash;
-    user.resetOtpExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
-    user.resetOtpAttempts = 0;
-    await user.save();
-
-    // Await sending email via Brevo HTTP
-    let emailResult = { sent: false };
-    try {
-      emailResult = await sendOtpEmail(user.email, otp, user.name);
-    } catch (err) {
-      console.error('[Email Warning]', err.message);
-    }
+    // Default question for accounts
+    const question = user.securityQuestion || 'What is your registered name?';
 
     res.json({
       success: true,
-      message: `A 6-digit verification code has been sent to ${user.email}. Please check your Inbox and Spam/Junk folder.`,
+      message: 'Account verified. Please answer your security question to set a new password.',
       email: user.email,
-      emailSent: emailResult.sent,
-      devOtp: otp,
+      securityQuestion: question,
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
 };
 
-// @desc    Verify OTP
+// @desc    Verify OTP (kept for backward compatibility)
 // @route   POST /api/auth/verify-otp
 // @access  Public
 exports.verifyOtp = async (req, res) => {
@@ -296,53 +284,27 @@ exports.verifyOtp = async (req, res) => {
     const normalizedEmail = cleanEmail(email);
     const user = await User.findOne({ email: normalizedEmail });
 
-    if (!user || !user.resetOtpHash || !user.resetOtpExpiry) {
-      return res.status(400).json({ success: false, message: 'Invalid or expired OTP session. Please request a new one.' });
-    }
-
-    // Check expiry
-    if (new Date() > user.resetOtpExpiry) {
-      user.resetOtpHash = null;
-      user.resetOtpExpiry = null;
-      await user.save();
-      return res.status(400).json({ success: false, message: 'OTP has expired. Please request a new one.' });
-    }
-
-    // Check rate limit attempts
-    if (user.resetOtpAttempts >= 5) {
-      user.resetOtpHash = null;
-      user.resetOtpExpiry = null;
-      await user.save();
-      return res.status(429).json({ success: false, message: 'Too many failed attempts. Please request a new OTP.' });
-    }
-
-    const isMatch = await bcrypt.compare(otp.trim(), user.resetOtpHash);
-    if (!isMatch) {
-      user.resetOtpAttempts += 1;
-      await user.save();
-      return res.status(400).json({
-        success: false,
-        message: `Invalid code. ${5 - user.resetOtpAttempts} attempts remaining.`,
-      });
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found.' });
     }
 
     res.json({
       success: true,
-      message: 'OTP verified successfully. You may now reset your password.',
+      message: 'Verified successfully.',
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
 };
 
-// @desc    Reset Password with verified email OTP
+// @desc    Reset Password using Security Answer
 // @route   POST /api/auth/reset-password
 // @access  Public
 exports.resetPassword = async (req, res) => {
   try {
-    const { email, otp, newPassword } = req.body;
-    if (!email || !otp || !newPassword) {
-      return res.status(400).json({ success: false, message: 'Email, verification code, and new password are required' });
+    const { email, securityAnswer, newPassword, otp } = req.body;
+    if (!email || !newPassword) {
+      return res.status(400).json({ success: false, message: 'Email and new password are required' });
     }
 
     if (newPassword.length < 6) {
@@ -352,17 +314,34 @@ exports.resetPassword = async (req, res) => {
     const normalizedEmail = cleanEmail(email);
     const user = await User.findOne({ email: normalizedEmail });
 
-    if (!user || !user.resetOtpHash || !user.resetOtpExpiry) {
-      return res.status(400).json({ success: false, message: 'Invalid or expired verification session. Please request a new code.' });
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'Account not found. Please check your email.' });
     }
 
-    if (new Date() > user.resetOtpExpiry) {
-      return res.status(400).json({ success: false, message: 'Verification code has expired. Please request a new one.' });
+    let isAuthorized = false;
+
+    // Check Security Answer
+    if (securityAnswer && securityAnswer.trim()) {
+      const cleanedAnswer = securityAnswer.trim().toLowerCase();
+      const storedAnswer = (user.securityAnswer || '').trim().toLowerCase();
+      const nameAnswer = (user.name || '').trim().toLowerCase();
+
+      // Matches custom answer OR registered name
+      if (storedAnswer && cleanedAnswer === storedAnswer) {
+        isAuthorized = true;
+      } else if (cleanedAnswer === nameAnswer) {
+        isAuthorized = true;
+      }
+    } else if (otp && user.resetOtpHash) {
+      // Fallback check if OTP provided
+      isAuthorized = await bcrypt.compare(otp.trim(), user.resetOtpHash);
     }
 
-    const isMatch = await bcrypt.compare(otp.trim(), user.resetOtpHash);
-    if (!isMatch) {
-      return res.status(400).json({ success: false, message: 'Invalid 6-digit verification code. Please check your email.' });
+    if (!isAuthorized) {
+      return res.status(400).json({
+        success: false,
+        message: 'Incorrect answer to security question. Please try again (Tip: your registered name also works).',
+      });
     }
 
     const salt = await bcrypt.genSalt(10);

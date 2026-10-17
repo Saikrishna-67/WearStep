@@ -49,6 +49,14 @@ const EyeOffIcon = () => (
   </svg>
 );
 
+const SECURITY_QUESTIONS = [
+  'What is your registered name?',
+  'What is your favorite footwear brand?',
+  'What was the name of your first school?',
+  'What is your favorite city?',
+  'What is your childhood nickname?',
+];
+
 export const AuthModal = ({ isOpen, onClose, onOpenAdminModal }) => {
   const { login, register } = useAuth();
   const { showToast } = useToast();
@@ -68,20 +76,14 @@ export const AuthModal = ({ isOpen, onClose, onOpenAdminModal }) => {
   const [regName, setRegName] = useState('');
   const [regEmail, setRegEmail] = useState('');
   const [regPassword, setRegPassword] = useState('');
+  const [regQuestion, setRegQuestion] = useState(SECURITY_QUESTIONS[0]);
+  const [regAnswer, setRegAnswer] = useState('');
 
   const [forgotEmail, setForgotEmail] = useState('');
-  const [otpCode, setOtpCode] = useState('');
+  const [securityQuestion, setSecurityQuestion] = useState('');
+  const [securityAnswer, setSecurityAnswer] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [devOtp, setDevOtp] = useState('');
-  const [resendCooldown, setResendCooldown] = useState(0);
-
-  useEffect(() => {
-    if (resendCooldown > 0) {
-      const timer = setTimeout(() => setResendCooldown((c) => c - 1), 1000);
-      return () => clearTimeout(timer);
-    }
-  }, [resendCooldown]);
 
   if (!isOpen) return null;
 
@@ -129,7 +131,13 @@ export const AuthModal = ({ isOpen, onClose, onOpenAdminModal }) => {
     const cleaned = regEmail.trim().toLowerCase().replace(/\.{2,}/g, '.');
     setLoading(true);
     try {
-      const res = await register(regName.trim(), cleaned, regPassword);
+      const res = await register(
+        regName.trim(),
+        cleaned,
+        regPassword,
+        regQuestion || SECURITY_QUESTIONS[0],
+        (regAnswer || regName).trim()
+      );
       showToast(res.message || 'Account created!');
       onClose();
     } catch (err) {
@@ -150,33 +158,14 @@ export const AuthModal = ({ isOpen, onClose, onOpenAdminModal }) => {
     setLoading(true);
     try {
       const res = await api.forgotPassword(cleaned);
-      if (res.devOtp) {
-        setDevOtp(res.devOtp);
-      }
-      showToast(res.message || 'Verification code sent! Check inbox & spam.');
-      setOtpCode('');
-      setResendCooldown(30);
+      setSecurityQuestion(res.securityQuestion || 'What is your registered name?');
+      setSecurityAnswer('');
+      setNewPassword('');
+      setConfirmPassword('');
+      showToast(res.message || 'Account located! Please answer your security question.');
       setMode('reset');
     } catch (err) {
-      showToast(err.message || 'Could not send verification code');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleResendCode = async () => {
-    if (resendCooldown > 0) return;
-    const cleaned = forgotEmail.trim().toLowerCase().replace(/\.{2,}/g, '.');
-    setLoading(true);
-    try {
-      const res = await api.forgotPassword(cleaned);
-      if (res.devOtp) {
-        setDevOtp(res.devOtp);
-      }
-      showToast('New verification code sent! Check inbox & spam.');
-      setResendCooldown(30);
-    } catch (err) {
-      showToast(err.message || 'Failed to resend verification code');
+      showToast(err.message || 'Could not find account');
     } finally {
       setLoading(false);
     }
@@ -184,8 +173,8 @@ export const AuthModal = ({ isOpen, onClose, onOpenAdminModal }) => {
 
   const handleResetSubmit = async (e) => {
     e.preventDefault();
-    if (!otpCode || !newPassword || !confirmPassword) {
-      showToast('Please fill in all fields');
+    if (!securityAnswer || !newPassword || !confirmPassword) {
+      showToast('Please answer the security question and set your new password');
       return;
     }
     if (newPassword.length < 6) {
@@ -199,17 +188,16 @@ export const AuthModal = ({ isOpen, onClose, onOpenAdminModal }) => {
     const cleaned = forgotEmail.trim().toLowerCase().replace(/\.{2,}/g, '.');
     setLoading(true);
     try {
-      const res = await api.resetPassword(cleaned, otpCode.trim(), newPassword);
+      const res = await api.resetPassword(cleaned, securityAnswer.trim(), newPassword);
       showToast(res.message || 'Password reset successful! Please log in.');
       setMode('login');
       setLoginEmail(cleaned);
       setLoginPassword('');
-      setOtpCode('');
+      setSecurityAnswer('');
       setNewPassword('');
       setConfirmPassword('');
-      setDevOtp('');
     } catch (err) {
-      showToast(err.message || 'Invalid verification code or reset failed');
+      showToast(err.message || 'Incorrect security answer or reset failed');
     } finally {
       setLoading(false);
     }
@@ -236,16 +224,16 @@ export const AuthModal = ({ isOpen, onClose, onOpenAdminModal }) => {
             {mode === 'login' && 'Welcome Back'}
             {mode === 'register' && 'Create Account'}
             {mode === 'forgot' && 'Reset Password'}
-            {mode === 'reset' && 'Enter Verification Code'}
+            {mode === 'reset' && 'Security Verification'}
           </h3>
 
           <p style={{ fontSize: '13px', color: 'var(--steel)', margin: 0 }}>
             {mode === 'login' && 'Sign in to access your orders, cart & wishlist.'}
             {mode === 'register' && 'Join the streetwear collective with exclusive drops.'}
-            {mode === 'forgot' && 'Enter your email to receive a 6-digit reset code.'}
+            {mode === 'forgot' && 'Enter your registered email to verify your security question.'}
             {mode === 'reset' && (
               <>
-                Sent to <strong style={{ color: 'var(--ink)' }}>{forgotEmail}</strong>
+                Account: <strong style={{ color: 'var(--ink)' }}>{forgotEmail}</strong>
               </>
             )}
           </p>
@@ -440,6 +428,36 @@ export const AuthModal = ({ isOpen, onClose, onOpenAdminModal }) => {
               </div>
             </div>
 
+            <div className="auth-field">
+              <label className="auth-label">Security Question (For Instant Password Reset)</label>
+              <select
+                className="auth-input"
+                style={{ cursor: 'pointer', paddingRight: '12px' }}
+                value={regQuestion}
+                onChange={(e) => setRegQuestion(e.target.value)}
+              >
+                {SECURITY_QUESTIONS.map((q) => (
+                  <option key={q} value={q}>
+                    {q}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="auth-field">
+              <label className="auth-label">Security Answer</label>
+              <div className="auth-input-wrapper">
+                <input
+                  type="text"
+                  className="auth-input"
+                  placeholder="e.g. your answer"
+                  value={regAnswer}
+                  onChange={(e) => setRegAnswer(e.target.value)}
+                  required
+                />
+              </div>
+            </div>
+
             <button
               type="submit"
               className="auth-btn-submit"
@@ -489,7 +507,7 @@ export const AuthModal = ({ isOpen, onClose, onOpenAdminModal }) => {
               className="auth-btn-submit"
               disabled={loading}
             >
-              {loading ? 'Sending Code...' : 'Send Verification Code ➔'}
+              {loading ? 'Finding Account...' : 'Continue to Security Question ➔'}
             </button>
 
             <div style={{ textAlign: 'center', marginTop: '16px' }}>
@@ -505,85 +523,46 @@ export const AuthModal = ({ isOpen, onClose, onOpenAdminModal }) => {
         )}
 
         {/* ─────────────────────────────────────────────────────────────
-            STEP 2: ENTER CODE & NEW PASSWORD
+            STEP 2: ANSWER SECURITY QUESTION & SET NEW PASSWORD
         ───────────────────────────────────────────────────────────── */}
         {mode === 'reset' && (
           <form onSubmit={handleResetSubmit}>
-            {/* SPAM / INBOX ALERT */}
+            {/* SECURITY QUESTION DISPLAY CARD */}
             <div
               style={{
                 background: 'rgba(212, 166, 74, 0.12)',
                 border: '1px solid rgba(212, 166, 74, 0.35)',
                 borderRadius: '12px',
-                padding: '12px 14px',
+                padding: '14px 16px',
                 margin: '4px 0 16px',
-                fontSize: '12px',
-                color: '#8A6218',
-                lineHeight: '1.45',
                 textAlign: 'left',
               }}
             >
-              <div style={{ fontWeight: '700', marginBottom: '3px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span>📬</span> Check Inbox &amp; Spam / Junk Folder
+              <div style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#8A6218', fontWeight: '700', marginBottom: '4px' }}>
+                Security Question for {forgotEmail}
               </div>
-              <div>
-                Institutional mail accounts (such as <strong>@sasi.ac.in</strong>) or Gmail frequently deliver automated security codes to your <strong>Spam / Junk</strong> folder.
+              <div style={{ fontSize: '15px', fontWeight: '600', color: 'var(--ink)' }}>
+                {securityQuestion || 'What is your registered name?'}
               </div>
             </div>
 
-            <div className="auth-field" style={{ marginTop: '6px' }}>
-              <label className="auth-label" style={{ textAlign: 'center', display: 'block', marginBottom: '8px' }}>
-                6-Digit Verification Code
-              </label>
-              <input
-                type="text"
-                className="auth-otp-input"
-                maxLength={6}
-                placeholder="••••••"
-                value={otpCode}
-                onChange={(e) => setOtpCode(e.target.value.replace(/[^0-9]/g, ''))}
-                autoFocus
-                required
-              />
-              <span style={{ display: 'block', textAlign: 'center', fontSize: '11px', color: 'var(--steel)', marginTop: '6px' }}>
-                Enter the 6 digits sent to your email inbox or spam folder
+            <div className="auth-field">
+              <label className="auth-label">Your Answer</label>
+              <div className="auth-input-wrapper">
+                <input
+                  type="text"
+                  className="auth-input"
+                  placeholder="Enter your answer"
+                  value={securityAnswer}
+                  onChange={(e) => setSecurityAnswer(e.target.value)}
+                  autoFocus
+                  required
+                />
+              </div>
+              <span style={{ display: 'block', fontSize: '11px', color: 'var(--steel)', marginTop: '5px', lineHeight: '1.4' }}>
+                💡 Tip: If you registered before setting a custom question, your registered account name is accepted.
               </span>
             </div>
-
-            {/* Instant Fallback Reveal if College Server Delays Email */}
-            {devOtp && (
-              <div
-                style={{
-                  background: 'rgba(25, 26, 24, 0.04)',
-                  border: '1px dashed rgba(25, 26, 24, 0.25)',
-                  borderRadius: '10px',
-                  padding: '10px 14px',
-                  marginBottom: '16px',
-                  fontSize: '12px',
-                  textAlign: 'center',
-                  color: 'var(--ink)',
-                }}
-              >
-                <span>Didn't receive email in inbox or spam? </span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setOtpCode(devOtp);
-                    showToast('Verification code auto-filled!');
-                  }}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    color: 'var(--rust)',
-                    fontWeight: '700',
-                    cursor: 'pointer',
-                    textDecoration: 'underline',
-                  }}
-                >
-                  Click to auto-fill code ({devOtp})
-                </button>
-              </div>
-            )}
 
             <div className="auth-field">
               <label className="auth-label">New Password</label>
@@ -632,24 +611,14 @@ export const AuthModal = ({ isOpen, onClose, onOpenAdminModal }) => {
               className="auth-btn-submit"
               disabled={loading}
             >
-              {loading ? 'Verifying...' : 'Set New Password ➔'}
+              {loading ? 'Verifying & Updating...' : 'Reset Password & Sign In ➔'}
             </button>
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '16px', gap: '10px' }}>
-              <button
-                type="button"
-                className="btn btn-ghost btn-sm"
-                onClick={handleResendCode}
-                disabled={resendCooldown > 0 || loading}
-                style={{ flex: 1 }}
-              >
-                {resendCooldown > 0 ? `Resend (${resendCooldown}s)` : 'Resend Code'}
-              </button>
+            <div style={{ textAlign: 'center', marginTop: '16px' }}>
               <button
                 type="button"
                 className="btn btn-ghost btn-sm"
                 onClick={() => setMode('login')}
-                style={{ flex: 1 }}
               >
                 ← Back to Login
               </button>

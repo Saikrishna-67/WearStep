@@ -52,8 +52,8 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const register = async (name, email, password) => {
-    const res = await api.register(name, email, password);
+  const register = async (name, email, password, securityQuestion, securityAnswer) => {
+    const res = await api.register(name, email, password, securityQuestion, securityAnswer);
     if (res.success && res.token) {
       localStorage.setItem('wearstep_token', res.token);
       localStorage.setItem('wearstep_user', JSON.stringify(res.user));
