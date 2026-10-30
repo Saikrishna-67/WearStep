@@ -263,9 +263,7 @@ exports.updateProfile = async (req, res) => {
   }
 };
 
-// @desc    Initiate Forgot Password - generate 6-digit OTP
-// @route   POST /api/auth/forgot-password
-// @desc    Initiate Forgot Password - retrieve security question
+// @desc    Initiate Forgot Password - generate 6-digit OTP and send via Brevo
 // @route   POST /api/auth/forgot-password
 // @access  Public
 exports.forgotPassword = async (req, res) => {
@@ -285,21 +283,37 @@ exports.forgotPassword = async (req, res) => {
       });
     }
 
-    // Default question for accounts
-    const question = user.securityQuestion || 'What is your registered name?';
+    // Generate secure 6-digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const salt = await bcrypt.genSalt(10);
+    const otpHash = await bcrypt.hash(otp, salt);
+
+    user.resetOtpHash = otpHash;
+    user.resetOtpExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+    user.resetOtpAttempts = 0;
+    await user.save();
+
+    // Send email via Brevo HTTP
+    let emailResult = { sent: false };
+    try {
+      emailResult = await sendOtpEmail(user.email, otp, user.name);
+    } catch (err) {
+      console.error('[Brevo Email Error]', err.message);
+    }
 
     res.json({
       success: true,
-      message: 'Account verified. Please answer your security question to set a new password.',
+      message: `A 6-digit verification code has been sent to ${user.email}. Please check your Inbox and Spam/Junk folder.`,
       email: user.email,
-      securityQuestion: question,
+      emailSent: emailResult.sent,
+      devOtp: process.env.NODE_ENV !== 'production' ? otp : undefined,
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
 };
 
-// @desc    Verify OTP (kept for backward compatibility)
+// @desc    Verify OTP
 // @route   POST /api/auth/verify-otp
 // @access  Public
 exports.verifyOtp = async (req, res) => {
@@ -312,90 +326,92 @@ exports.verifyOtp = async (req, res) => {
     const normalizedEmail = cleanEmail(email);
     const user = await User.findOne({ email: normalizedEmail });
 
-    if (!user) {
-      return res.status(404).json({ success: false, message: 'User not found.' });
+    if (!user || !user.resetOtpHash || !user.resetOtpExpiry) {
+      return res.status(400).json({ success: false, message: 'Invalid or expired OTP session. Please request a new one.' });
+    }
+
+    // Check expiry
+    if (new Date() > user.resetOtpExpiry) {
+      user.resetOtpHash = null;
+      user.resetOtpExpiry = null;
+      await user.save();
+      return res.status(400).json({ success: false, message: 'OTP has expired. Please request a new code.' });
+    }
+
+    // Check rate limit attempts
+    if (user.resetOtpAttempts >= 5) {
+      user.resetOtpHash = null;
+      user.resetOtpExpiry = null;
+      await user.save();
+      return res.status(429).json({ success: false, message: 'Too many failed attempts. Please request a new code.' });
+    }
+
+    const isMatch = await bcrypt.compare(otp.trim(), user.resetOtpHash);
+    if (!isMatch) {
+      user.resetOtpAttempts = (user.resetOtpAttempts || 0) + 1;
+      await user.save();
+      return res.status(400).json({
+        success: false,
+        message: `Invalid code. ${5 - user.resetOtpAttempts} attempts remaining.`,
+      });
     }
 
     res.json({
       success: true,
-      message: 'Verified successfully.',
+      message: 'Code verified successfully.',
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
 };
 
-// @desc    Direct Reset Password using Email/Phone + 4-Digit Recovery PIN
+// @desc    Reset Password with verified email OTP sent via Brevo
 // @route   POST /api/auth/reset-password
 // @access  Public
 exports.resetPassword = async (req, res) => {
   try {
-    const { email, identifier, phone, pin, recoveryPin, securityAnswer, newPassword, otp } = req.body;
-    const lookupKey = (email || identifier || phone || '').toString().trim();
-
-    if (!lookupKey || !newPassword) {
-      return res.status(400).json({ success: false, message: 'Registered Email or Phone, and new password are required' });
+    const { email, otp, newPassword } = req.body;
+    if (!email || !otp || !newPassword) {
+      return res.status(400).json({ success: false, message: 'Email, verification code, and new password are required' });
     }
 
     if (newPassword.length < 6) {
       return res.status(400).json({ success: false, message: 'Password must be at least 6 characters' });
     }
 
-    const normalizedEmail = cleanEmail(lookupKey);
-    const cleanPhone = lookupKey.replace(/[^0-9]/g, '');
-
-    // Look up by email or phone
-    let user = await User.findOne({
-      $or: [
-        { email: normalizedEmail },
-        ...(cleanPhone.length >= 7 ? [{ phone: { $regex: cleanPhone + '$' } }] : []),
-      ],
-    });
+    const normalizedEmail = cleanEmail(email);
+    const user = await User.findOne({ email: normalizedEmail });
 
     if (!user) {
-      return res.status(404).json({ success: false, message: 'No account found with this email or phone. Please verify your details.' });
+      return res.status(404).json({ success: false, message: 'No account found with this email.' });
     }
 
-    const enteredPin = (pin || recoveryPin || securityAnswer || otp || '').toString().trim().toLowerCase();
-    let isAuthorized = false;
-
-    // 1. Check recovery PIN or default 1234 / 0000
-    const storedPin = (user.recoveryPin || '1234').toString().trim();
-    if (enteredPin === storedPin || enteredPin === '1234' || enteredPin === '0000') {
-      isAuthorized = true;
+    if (!user.resetOtpHash || !user.resetOtpExpiry) {
+      return res.status(400).json({ success: false, message: 'Invalid or expired verification session. Please request a new code.' });
     }
 
-    // 2. Check if enteredPin matches last digits of user's phone
-    if (user.phone && enteredPin.length >= 3 && user.phone.endsWith(enteredPin)) {
-      isAuthorized = true;
+    if (new Date() > user.resetOtpExpiry) {
+      return res.status(400).json({ success: false, message: 'Verification code has expired. Please request a new code.' });
     }
 
-    // 3. Fallback checks for account name or email tags
-    const nameAnswer = (user.name || '').trim().toLowerCase();
-    const storedAnswer = (user.securityAnswer || '').trim().toLowerCase();
-    if (
-      (nameAnswer && (enteredPin === nameAnswer || nameAnswer.includes(enteredPin))) ||
-      (storedAnswer && enteredPin === storedAnswer) ||
-      ['saikrishna', 'kit', '24'].includes(enteredPin)
-    ) {
-      isAuthorized = true;
-    }
-
-    if (!isAuthorized) {
+    const isMatch = await bcrypt.compare(otp.trim(), user.resetOtpHash);
+    if (!isMatch) {
+      user.resetOtpAttempts = (user.resetOtpAttempts || 0) + 1;
+      await user.save();
       return res.status(400).json({
         success: false,
-        message: 'Invalid Recovery PIN. (Default recovery PIN is 1234)',
+        message: 'Invalid 6-digit verification code. Please check your email inbox or spam folder.',
       });
     }
 
     const salt = await bcrypt.genSalt(10);
     user.passwordHash = await bcrypt.hash(newPassword, salt);
-    if (enteredPin && /^\d{4,6}$/.test(enteredPin)) {
-      user.recoveryPin = enteredPin;
-    }
     user.resetOtpHash = null;
     user.resetOtpExpiry = null;
     user.resetOtpAttempts = 0;
+    if (user.isAccessGranted === false) {
+      user.isAccessGranted = true;
+    }
     await user.save();
 
     const token = generateToken(user._id);

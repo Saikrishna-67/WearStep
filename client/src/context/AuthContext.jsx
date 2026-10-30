@@ -52,8 +52,8 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const register = async (name, email, password, phone = '', recoveryPin = '1234') => {
-    const res = await api.register(name, email, password, phone, recoveryPin);
+  const register = async (name, email, password, phone = '') => {
+    const res = await api.register(name, email, password, phone);
     if (res.success && res.token) {
       localStorage.setItem('wearstep_token', res.token);
       localStorage.setItem('wearstep_user', JSON.stringify(res.user));
@@ -63,8 +63,8 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const resetPassword = async (identifier, pin, newPassword) => {
-    const res = await api.resetPassword(identifier, pin, newPassword);
+  const resetPassword = async (email, otp, newPassword) => {
+    const res = await api.resetPassword(email, otp, newPassword);
     if (res.success && res.token && res.user) {
       localStorage.setItem('wearstep_token', res.token);
       localStorage.setItem('wearstep_user', JSON.stringify(res.user));
